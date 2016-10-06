@@ -23,7 +23,7 @@ if $FLL_EMPTY_CFLAGS; then
         CFLAGS=""
 fi
 
-C_ARG_WITH(cc,
+AC_ARG_WITH(cc,
     AS_HELP_STRING([--with-cc=compiler],[use specific C compiler]),
     [
 	case "$withval" in
@@ -48,7 +48,7 @@ AC_DEFINE_UNQUOTED(FLL_HOST_STRING,"$host",[Host system alias])
 FLL_HOST_STRING="$host"
 AC_DEFINE_UNQUOTED(FLL_COMPILER,"`$CC -v 2>&1 | tail -n 1`",[Compiler])
 
-AM_INIT_AUTOMAKE([foreign no-exeext dist-bzip2])
+AM_INIT_AUTOMAKE([1.15 foreign])
 AM_MAINTAINER_MODE
 AC_PROG_LIBTOOL
 
@@ -276,7 +276,6 @@ AC_SUBST(FLL_LDFLAGS)
 AC_CONFIG_FILES([ \
 	Makefile \
 	include/Makefile \
-	include/midway/Makefile \
 	servolib/Makefile \
 	facelockedloop/Makefile \
 	])
@@ -288,17 +287,18 @@ if test \! x$FLL_MAYBE_DOCDIR = x ; then
 	doc/doxygen/Doxyfile-common \
 	doc/doxygen/Doxyfile-html \
 	doc/doxygen/Doxyfile-pdf \
-	doc/docbook/Makefile \
-	doc/docbook/catalog \
-	doc/docbook/custom-stylesheets/Makefile \
-	doc/docbook/custom-stylesheets/xsl/Makefile \
-	doc/docbook/custom-stylesheets/xsl/common/Makefile \
-	doc/docbook/custom-stylesheets/xsl/fo/Makefile \
-	doc/docbook/custom-stylesheets/xsl/html/Makefile \
-	doc/docbook/custom-stylesheets/xsl/html/chunk.xsl \
-	doc/docbook/custom-stylesheets/xsl/html/onechunk.xsl \
-	doc/docbook/fll/Makefile \
-      ])
+        ])
+dnl	doc/docbook/Makefile \
+dnl	doc/docbook/catalog \
+dnl	doc/docbook/custom-stylesheets/Makefile \
+dnl	doc/docbook/custom-stylesheets/xsl/Makefile \
+dnl	doc/docbook/custom-stylesheets/xsl/common/Makefile \
+dnl	doc/docbook/custom-stylesheets/xsl/fo/Makefile \
+dnl	doc/docbook/custom-stylesheets/xsl/html/Makefile \
+dnl	doc/docbook/custom-stylesheets/xsl/html/chunk.xsl \
+dnl	doc/docbook/custom-stylesheets/xsl/html/onechunk.xsl \
+dnl	doc/docbook/fll/Makefile \
+dnl      ])
 fi
 
 AC_OUTPUT()
