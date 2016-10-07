@@ -22,19 +22,20 @@
 #include <termios.h>
 #include <getopt.h>
 #include <errno.h>
-
+#include <fcntl.h>
+#include "servolib.h"
 #define SERVO_CHANNEL_MAX 6
 
-extern int verbose;
+int verbose = 1;
 
-#define printerr(s, ...)                                \
-        fptrintf(stderr, "%s:%d %s: " s "\n", __FILE__, \
-		 __LINE__, __func__, ##__VA_ARGS__);    \
+#define printerr(s, ...)				\
+	fprintf(stderr, "%s:%d %s" s "\n", __FILE__,	\
+		__LINE__, __func__, ##__VA_ARGS__);	\
 
-#define printdbg(s, ...)
+#define printdbg(s, ...)				\
         do {						\
 	       if (verbose)				\
-		 printerr(s, ##__VA_args__);		\
+		 printerr(s, ##__VA_ARGS__);		\
 	}while (0);
 
 static int __servoio_open(int id, int mode)
@@ -59,7 +60,7 @@ static int __servoio_open(int id, int mode)
 	if (cfsetispeed(&term_attribs, B9600) < 0)
 		printerr("invalid baud rate");
 
-	tcsetattr(fd, TCSANOW, &termoptions);
+	tcsetattr(fd, TCSANOW, &term_attribs);
 	
 	return fd;
 }
@@ -202,7 +203,7 @@ static int __servoio_read_error(int fd)
 	char buf[2];
 	int ret;
 
-	ret = write(fd, cmd, sizeof(cmd));
+	ret = write(fd, &cmd, 1);
 	if (ret <= 0)
 		return ret ? -errno : -EINVAL;
 	
@@ -225,7 +226,7 @@ static int __servoio_reset_all(int fd)
 	char cmd = 0xa2;
 	int ret;
 	
-	ret = write(fd, cmd, sizeof(cmd));
+	ret = write(fd, &cmd, 1);
 	if (ret <= 0)
 		return ret ? -errno : -EINVAL;
 
@@ -265,7 +266,7 @@ int servoio_set_pulse(int id, int channel, int value)
 	return ret;
 }
 
-int servoio_configure(int id, int channel, int pulse=0, int speed=0, int accel=0)
+int servoio_configure(int id, int channel, int pulse, int speed, int accel)
 {
 	int fd, ret;
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
@@ -309,7 +310,7 @@ int servoio_get_position(int id, int channel)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
-	ret = __servioio_read_position(fd, channel);
+	ret = __servoio_read_pos(fd, channel);
 	close(fd);
 
 	return ret;
@@ -328,6 +329,7 @@ int servoio_get_any_error(int id)
 }
 
 int servoio_all_go_home(int id)
+{
 	int fd, ret;
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
