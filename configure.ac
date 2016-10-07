@@ -119,7 +119,7 @@ AC_ARG_ENABLE(host,
 AC_MSG_RESULT(${host_mode:-no})
 AM_CONDITIONAL(FLL_BUILD_HOST,[test \! x$host_mode = x])
 
-checkflags="-nostdinc -isystem \$(SYSROOT)/usr/include -Wbitwise -Wno-transparent-union -D_GNU_SOURCE -D_XOPEN_SOURCE=500 -D_REENTRANT \$(DEFS) \$(DEFAULT_INCLUDES) \$(INCLUDES) \$(AM_CPPFLAGS) \$(CPPFLAGS) -I\$(top_srcdir)/include -isystem \$(shell \$(CC) -print-file-name=include) -include \$(top_builddir)/include/bighill_config.h \$(shell \$(CC) -dM -E -xc /dev/null|sed -e 's/^\\#define /-D/' -e \"s/ /=\'/\" -e \"s/\$\$/\'/\")"
+checkflags="-nostdinc -isystem \$(SYSROOT)/usr/include -Wbitwise -Wno-transparent-union -D_GNU_SOURCE -D_XOPEN_SOURCE=500 -D_REENTRANT \$(DEFS) \$(DEFAULT_INCLUDES) \$(INCLUDES) \$(AM_CPPFLAGS) \$(CPPFLAGS) -I\$(top_srcdir)/include -isystem \$(shell \$(CC) -print-file-name=include) \$(shell \$(CC) -dM -E -xc /dev/null|sed -e 's/^\\#define /-D/' -e \"s/ /=\'/\" -e \"s/\$\$/\'/\")"
 
 dnl Used with sparse
 AC_SUBST(CHECKFLAGS, $checkflags)
@@ -193,7 +193,7 @@ esac
 DBX_NET="$FLL_DBX_NET"
 DBX_ROOT="$FLL_DBX_ROOT"
 DBX_XSL_ROOT="$FLL_DBX_XSL_ROOT"
-DBX_DOC_INIT(doc/docbook, doc/generated, 4.2)
+dnl DBX_DOC_INIT(doc/docbook, doc/generated, 4.2)
 
 AC_MSG_CHECKING(whether using LaTeX non-stop mode)
 AC_ARG_ENABLE(verbose-latex,
@@ -212,9 +212,9 @@ else
    LATEX_MODE=batchmode
 fi
 
-AC_DEFINE_UNQUOTED(FLL_VERSION_MAJOR,$BIGHILL_VERSION_MAJOR,[config])
-AC_DEFINE_UNQUOTED(FLL_VERSION_MINOR,$BIGHILL_VERSION_MINOR,[config])
-AC_DEFINE_UNQUOTED(FLL_REVISION_LEVEL,$BIGHILL_REVISION_LEVEL,[config])
+AC_DEFINE_UNQUOTED(FLL_VERSION_MAJOR,$FLL_VERSION_MAJOR,[config])
+AC_DEFINE_UNQUOTED(FLL_VERSION_MINOR,$FLL_VERSION_MINOR,[config])
+AC_DEFINE_UNQUOTED(FLL_REVISION_LEVEL,$FLL_REVISION_LEVEL,[config])
 AC_DEFINE_UNQUOTED(FLL_PREFIX,"$prefix",[config])
 
 AH_VERBATIM(FLL___,[#ifdef __IN_FLL__])
@@ -273,6 +273,7 @@ AC_SUBST(FLL_HOST_STRING)
 AC_SUBST(FLL_CFLAGS)
 AC_SUBST(FLL_LDFLAGS)
 
+AM_EXTRA_RECURSIVE_TARGETS([servolib facelockedloop])
 AC_CONFIG_FILES([ \
 	Makefile \
 	include/Makefile \
