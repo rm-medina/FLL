@@ -1,6 +1,6 @@
 SUBDIRS=doxygen
 
-GENERATE_DOC=$(top_srcdir)/scripts/generate-doc
+GENERATE_DOC=generate-doc
 
 generate-doc: FORCE
 	@if test \! -e $(GENERATE_DOC) -o \! -e $(top_srcdir)/.git ; then \
