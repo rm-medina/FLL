@@ -1,7 +1,9 @@
 #!/bin/sh
 
 aclocal --install -I m4 &&
-  autoconf &&
-  automake --add-missing --copy &&
-  ./configure "$@"
+    autoheader &&
+    libtoolize -c --automake --force &&
+    autoconf &&
+    automake --add-missing --copy &&
+    ./configure "$@"
 
