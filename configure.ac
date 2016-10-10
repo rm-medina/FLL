@@ -5,9 +5,9 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_INIT([FLL],m4_normalize(m4_include([config/version])),raquel.medina.rodriguez@gmail.com)
 
-FLL_VERSION_MAJOR=`expr $PACKAGE_VERSION : '\([[0-9]]*\'`
+FLL_VERSION_MAJOR=`expr $PACKAGE_VERSION : '\([[0-9]]*\)'`
 FLL_VERSION_MINOR=`expr $PACKAGE_VERSION : '\[[0-9]]*\.\([[0-9]]*\)'`
-FLL_REVISION=`expr $PACKAGE_VERSION : '\([[0-9]]*\.([[0-9]]*\.\([[0-9]]*\)'`
+FLL_REVISION=`expr $PACKAGE_VERSION : '\[[0-9]]*\.[[0-9]]*\.\([[0-9]]*\)'`
 test "x$FLL_REVISION" = "x" && FLL_REVISION=0
 
 AC_CONFIG_HEADERS(include/fll_config.h)
@@ -214,9 +214,9 @@ else
 	AC_MSG_RESULT(${FLL_DBX_DOC:-no})
 fi
 AM_CONDITIONAL(FLL_DBX_DOC,[test "$FLL_DBX_DOC"=y])
-DBX_DOC_ROOT = $FLL_DBX_DOC
+dnl DBX_DOC_ROOT = "doc/docbook"
 dnl AC_SUBST(DBX_DOC_ROOT)
-DBX_GEN_DOC_ROOT = "doc/generated"
+dnl DBX_GEN_DOC_ROOT = "doc/generated"
 dnl AC_SUBST(DBX_GEN_DOC_ROOT)
 
 dnl

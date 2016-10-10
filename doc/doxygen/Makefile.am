@@ -1,7 +1,7 @@
 HTML_DOCS=fll
 PDF_DOCS= fll.pdf
 
-EXTRA_DIST = Doxyfile-html.in Doxyfile-pdf.in Doxyfile-common.in
+EXTRA_DIST = Doxyfile-html Doxyfile-pdf Doxyfile-common
 
 if !FLL_BUILD_DOC
 HTML_DOCSDIR = $(srcdir)/../generated/html/
@@ -17,11 +17,11 @@ fll: Doxyfile-html
 
 fll.pdf: FORCE
 	$(DOXYGEN) $(DOXYDOC_OPTS) Doxyfile-pdf
-	$(MAKE) -C latex-fll refman.pdf
-	mv latex-fll/refman.pdf $@
+	$(MAKE) -C fll-latex refman.pdf
+	mv fll-latex/refman.pdf $@
 
 distclean-local:
-	for dir in $(HTML_DOCS) latex-fll; do \
+	for dir in $(HTML_DOCS) fll-latex; do \
 	    if test -d $$dir ; then $(RM) -R $$dir ; fi ; \
 	done
 
