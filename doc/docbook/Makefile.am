@@ -1,4 +1,4 @@
-SUBDIRS=custom-stylesheets fll
+SUBDIRS=custom-stylesheets
 
 include docbook.rules
 

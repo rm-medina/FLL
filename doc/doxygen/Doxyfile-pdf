@@ -159,7 +159,7 @@ GENERATE_LATEX         = YES
 # If a relative path is entered the value of OUTPUT_DIRECTORY will be 
 # put in front of it. If left blank `latex' will be used as the default path.
 
-LATEX_OUTPUT           = latex-bighill
+LATEX_OUTPUT           = latex-fll
 
 # The LATEX_CMD_NAME tag can be used to specify the LaTeX command name to be 
 # invoked. If left blank `latex' will be used as the default command name.
@@ -230,8 +230,7 @@ LATEX_HIDE_INDICES     = NO
 # contain include files that are not input files but should be processed by 
 # the preprocessor.
 
-# Added top_buildir/include here for the definition of BIGHILL_PROTO in
-# bighill_config.h
+# Added top_buildir/include here 
 INCLUDE_PATH           = \
 ../../include \
 ../../include

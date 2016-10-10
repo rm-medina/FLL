@@ -5,5 +5,5 @@ aclocal --install -I m4 &&
     libtoolize -c --automake --force &&
     autoconf &&
     automake --add-missing --copy &&
-    ./configure "$@"
+    ./configure --enable-doc "$@"
 

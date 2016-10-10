@@ -1,4 +1,6 @@
+dnl
 dnl Process this file with autoconf to produce a configure script.
+dnl
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_INIT([FLL],m4_normalize(m4_include([config/version])),raquel.medina.rodriguez@gmail.com)
@@ -18,7 +20,9 @@ AC_PROG_INSTALL
 AM_PROG_LEX
 AC_PROG_YACC
 
-#Do no let autoconf set the default value of CFLAGS
+dnl
+dnl Do no let autoconf set the default value of CFLAGS
+dnl
 if $FLL_EMPTY_CFLAGS; then
         CFLAGS=""
 fi
@@ -71,15 +75,16 @@ case "$build_for" in
 	;;
  *) echo ""
    echo "*******************************************"
-   echo "Unsupported target: $build_for -- Sorry."
+   echo "Unsupported target: $build_for !!!!!"
    echo "*******************************************"
    echo ""
    exit 1;;
 esac
 AC_MSG_RESULT([$target_arch])
 
+dnl
 dnl Debug build (default: off)
-
+dnl
 debug_mode=
 AC_MSG_CHECKING(whether to enable debug mode)
 AC_ARG_ENABLE(debug,
@@ -92,8 +97,9 @@ AC_ARG_ENABLE(debug,
 AC_MSG_RESULT(${debug_mode:-no})
 AM_CONDITIONAL(FLL_BUILD_DEBUG,[test \! x$debug_mode = x])
 
+dnl
 dnl Stats build (default: off)
-
+dnl
 stats_mode=
 AC_MSG_CHECKING(whether to enable stats mode)
 AC_ARG_ENABLE(stats,
@@ -106,8 +112,9 @@ AC_ARG_ENABLE(stats,
 AC_MSG_RESULT(${stats_mode:-no})
 AM_CONDITIONAL(FLL_BUILD_STATS,[test \! x$stats_mode = x])
 
+dnl
 dnl Host mode build (default: off)
-
+dnl
 host_mode=
 AC_MSG_CHECKING(whether to enable host mode)
 AC_ARG_ENABLE(host,
@@ -119,13 +126,15 @@ AC_ARG_ENABLE(host,
 AC_MSG_RESULT(${host_mode:-no})
 AM_CONDITIONAL(FLL_BUILD_HOST,[test \! x$host_mode = x])
 
-checkflags="-nostdinc -isystem \$(SYSROOT)/usr/include -Wbitwise -Wno-transparent-union -D_GNU_SOURCE -D_XOPEN_SOURCE=500 -D_REENTRANT \$(DEFS) \$(DEFAULT_INCLUDES) \$(INCLUDES) \$(AM_CPPFLAGS) \$(CPPFLAGS) -I\$(top_srcdir)/include -isystem \$(shell \$(CC) -print-file-name=include) \$(shell \$(CC) -dM -E -xc /dev/null|sed -e 's/^\\#define /-D/' -e \"s/ /=\'/\" -e \"s/\$\$/\'/\")"
-
+dnl
 dnl Used with sparse
+dnl
+checkflags="-nostdinc -isystem \$(SYSROOT)/usr/include -Wbitwise -Wno-transparent-union -D_GNU_SOURCE -D_XOPEN_SOURCE=500 -D_REENTRANT \$(DEFS) \$(DEFAULT_INCLUDES) \$(INCLUDES) \$(AM_CPPFLAGS) \$(CPPFLAGS) -I\$(top_srcdir)/include -isystem \$(shell \$(CC) -print-file-name=include) \$(shell \$(CC) -dM -E -xc /dev/null|sed -e 's/^\\#define /-D/' -e \"s/ /=\'/\" -e \"s/\$\$/\'/\")"
 AC_SUBST(CHECKFLAGS, $checkflags)
 
-dnl Enable assertions (default: on)
-
+dnl
+dnl Enable assertions (default: no)
+dnl
 use_assert=
 if test -n "$debug_mode"; then
   use_assert=y
@@ -139,8 +148,11 @@ AC_ARG_ENABLE(assert,
 	esac])
 AC_MSG_RESULT(${use_assert:-no})
 
-dnl Documentation package.
-
+dnl
+dnl Documentation package:
+dnl checking for doxygen (html, docbook, latex, man documentation)
+dnl Adapted from xenomai project: xenomai.org 
+dnl
 if test x"$docdir" = x; then
 	docdir=$datadir/doc/$PACKAGE-$VERSION
 fi
@@ -153,7 +165,7 @@ else
 fi
 AC_SUBST(FLL_MAYBE_DOCDIR)
 
-AC_MSG_CHECKING(for Doxygen documentation)
+AC_MSG_CHECKING(for Doxygen doc generation)
 AC_ARG_ENABLE(doc,
 	AS_HELP_STRING([--enable-doc], [Build Doxygen documentation]),
 	[case "$enableval" in
@@ -164,7 +176,7 @@ AC_ARG_ENABLE(doc,
 if test \! -d $srcdir/doc ; then
     if test x$FLL_BUILD_DOC = xy ;
     then
-	AC_MSG_ERROR([documentation tree is missing.])
+	AC_MSG_ERROR([doc folder is missing.])
     fi
     AC_MSG_RESULT([not present])
 else
@@ -174,7 +186,7 @@ fi
 AC_CHECK_PROG(DOXYGEN, doxygen, doxygen)
 
 if test x${FLL_BUILD_DOC} = xy -a x"$DOXYGEN" = x ; then
-   AC_MSG_ERROR([Missing the Doxygen tools to generate the documentation.])
+   AC_MSG_ERROR([Missing Doxygen.])
 fi
 
 AC_CHECK_PROG(DOXYGEN_HAVE_DOT, dot, YES, NO)
@@ -184,17 +196,54 @@ else
    DOXYGEN_SHOW_INCLUDE_FILES=YES
 fi
 
-case "$FLL_DOC_DBX" in
-y | ye | yes)
-    DBX_DOC=yes ;;
-*)
-    DBX_DOC="" ;;
-esac
-DBX_NET="$FLL_DBX_NET"
-DBX_ROOT="$FLL_DBX_ROOT"
-DBX_XSL_ROOT="$FLL_DBX_XSL_ROOT"
-dnl DBX_DOC_INIT(doc/docbook, doc/generated, 4.2)
+AC_MSG_CHECKING(whether compiling Docbook XML documentation)
+AC_ARG_ENABLE(dbx,
+	AS_HELP_STRING([--enable-dbx], [Build DocBook XML documentation.]),
+	[case "$enableval" in
+	y | ye | yes) FLL_DBX_DOC=y ;;
+	*) unset FLL_DBX_DOC ;;
+	esac])
 
+if test \! -f $srcdir/doc/catalog.in ; then
+   	if test x$FLL_DBX_DOC = xy
+	then
+		AC_MSG_ERROR([DBX catalog is missing!!])
+	fi
+	AC_MSG_RESULT([not present])
+else
+	AC_MSG_RESULT(${FLL_DBX_DOC:-no})
+fi
+AM_CONDITIONAL(FLL_DBX_DOC,[test "$FLL_DBX_DOC"=y])
+DBX_DOC_ROOT = $FLL_DBX_DOC
+dnl AC_SUBST(DBX_DOC_ROOT)
+DBX_GEN_DOC_ROOT = "doc/generated"
+dnl AC_SUBST(DBX_GEN_DOC_ROOT)
+
+dnl
+dnl XSL over network:
+dnl
+AC_MSG_CHECKING(for docbook-xsl root dir)
+AC_ARG_WITH(docbook-xsl-root,
+	AS_HELP_STRING([--with-dbx-xsl-root],[specify the Docbook XML XSL
+stylesheet root. Default is to use well-known locations (or network if
+--enable-dbx-network was passed)]),
+        [ DBX_XSL_ROOT="$withval" ])
+if test x"$DBX_XSL_ROOT" = x; then
+   	if test x"$enable_dbx_network" != x -a -n "$FLL_DBX_DOC" ; then
+      	   AC_MSG_ERROR([The DocBook XML DTD was not found and cannot access via
+      	   the net.])
+      	fi
+	DBX_XLS_ROOT="docbook.sourceforge.net/release/xsl/current/"
+	AC_MSG_RESULT([not present, going to sourceforge.net])
+else
+	DBX_XSL_ROOT="file://$DBX_XSL_ROOT"
+	AC_MSG_RESULT(${DBX_XSL_ROOT:?})
+fi
+AC_SUBST(DBX_XSL_ROOT)    
+
+dnl
+dnl LaTeX
+dnl
 AC_MSG_CHECKING(whether using LaTeX non-stop mode)
 AC_ARG_ENABLE(verbose-latex,
 	AS_HELP_STRING([--enable-verbose-latex], [Uses LaTeX non-stop mode]),
