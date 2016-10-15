@@ -5,5 +5,4 @@ aclocal --install -I m4 &&
     libtoolize -c --automake --force &&
     autoconf &&
     automake --add-missing --copy &&
-    ./configure --enable-doc "$@"
-
+    ./configure --enable-doc --with-opencv=/usr/ "$@"

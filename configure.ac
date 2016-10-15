@@ -149,6 +149,44 @@ AC_ARG_ENABLE(assert,
 AC_MSG_RESULT(${use_assert:-no})
 
 dnl
+dnl OpenCV
+dnl
+AC_MSG_CHECKING(for OpenCV libraries)
+AC_ARG_WITH(opencv,
+	AS_HELP_STRING([--with-opencv], [specify where to find opencv]),
+	[case "$withval" in
+	      y | yes) opencv=y ;;
+	      n | no) opencv=n ;;
+	      *)
+	      opencv=y
+	      opencvinc="-I$withval/include/opencv2"
+	      opencvlib="-L$withval/lib"
+	      ;;
+	      esac])
+AC_MSG_RESULT(${opencv:-no})
+AC_SUBST(opencvinc)
+AC_SUBST(opencvlib)
+OLD_CFLAGS=$CFLAGS
+OLD_LIBS=$LIBS
+LIBS=$opencvlib
+CFLAGS=$opencvinc
+opencv=n
+opencv2=n
+AC_MSG_CHECKING([for OpenCV older than 2.4.x])
+AC_CHECK_LIB(opencv_imgproc, cvResize,
+	     [
+	     OPENCV_ADD_LDFLAG="-lopencv_core -lopencv_highgui -lopencv_objdetect -lopencv_features2d -lopencv_imgproc"
+	     opencv=y
+	     opencv2=y
+	     ]
+	     )
+AC_SUBST(OPENCV_ADD_LDFLAG)
+
+CFLAGS=$OLD_CFLAGS
+LIBS=$OLD_LIBS
+AM_CONDITIONAL([USEOPENCV], [test  x"$opencv" != xn])
+AM_CONDITIONAL([HAVE_OPENCV2], [test x"$opencv2" != xn])
+dnl
 dnl Documentation package:
 dnl checking for doxygen (html, docbook, latex, man documentation)
 dnl Adapted from xenomai project: xenomai.org 
@@ -302,6 +340,7 @@ if test x$use_assert = x; then
 fi
 
 FLL_CFLAGS="$FLL_CFLAGS -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wno-unused-parameter -Werror -fstrict-aliasing"
+FLL_EXTRA_CFLAGS="-Wno-unused-function"
 LIBS=
 
 AC_MSG_CHECKING([for test source generation])
@@ -320,6 +359,7 @@ AC_SUBST(LATEX_MODE)
 AC_SUBST(FLL_BUILD_STRING)
 AC_SUBST(FLL_HOST_STRING)
 AC_SUBST(FLL_CFLAGS)
+AC_SUBST(FLL_EXTRA_CFLAGS)
 AC_SUBST(FLL_LDFLAGS)
 
 AM_EXTRA_RECURSIVE_TARGETS([servolib facelockedloop])
