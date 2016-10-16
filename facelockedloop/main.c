@@ -110,7 +110,7 @@ static void teardown_skeleton(void)
 
 int main(int argc, char *const argv[])
 {
-	const char *output_file, *xmlfile;
+	const char *outfile, *xmlfile;
 	struct timespec start_time, stop_time, duration;
 	int pos[FLL_MAX_SERVO_COUNT] =
 		{ [0 ... FLL_MAX_SERVO_COUNT -1] = -1};
@@ -119,9 +119,9 @@ int main(int argc, char *const argv[])
 	int accel[FLL_MAX_SERVO_COUNT] =
 		{ [0 ... FLL_MAX_SERVO_COUNT -1] = -1};
 	struct servo_params servo_params[FLL_SERVO_COUNT] __attribute__((unused));
-	int lindex, c;
-	int i = 0;
-	output_file = xmlfile = NULL;
+	int lindex, c, i;
+	outfile = NULL;
+	xmlfile = NULL;
 	
 	/* get local configurations */
 	for (;;) {
@@ -137,7 +137,7 @@ int main(int argc, char *const argv[])
 			xmlfile = optarg;
 			break;
 		case output_opt:
-			output_file = optarg;
+			outfile = optarg;
 			break;
 		default:
 			usage();
@@ -146,12 +146,12 @@ int main(int argc, char *const argv[])
 	}
 	if (xmlfile != NULL)
 		printf("cascade filter:%s.\n", xmlfile);
-	if (output_file != NULL)
-		printf("output data:%s.\n", output_file);
+	if (outfile != NULL)
+		printf("output data:%s.\n", outfile);
 	
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	init_skeleton();
-	for (;i < FLL_MAX_SERVO_COUNT; i++)
+	for (i=0; i < FLL_MAX_SERVO_COUNT; i++)
 		printf("servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
 		       i, pos[i], speed[i], accel[i]);
 
@@ -159,7 +159,5 @@ int main(int argc, char *const argv[])
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &start_time, &stop_time);
 	printf("duration->  %lds %ldns .\n", duration.tv_sec , duration.tv_nsec );
-
 	return 0;
-	
 }
