@@ -1,4 +1,13 @@
-bin_PROGRAMS = fll
+bin_PROGRAMS = fll test-display
+
+test_display_SOURCES =	\
+	test-display.c
+
+test_display_CPPFLAGS = \
+	$(fll_CPPFLAGS)
+
+test_display_LDADD = \
+	$(fll_LDADD)
 
 fll_SOURCES = \
 	main.c	
