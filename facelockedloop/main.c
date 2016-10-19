@@ -39,6 +39,12 @@ static const struct option options[] = {
 		.flag = &with_output,
 		.val = 1,
 	},
+	{
+#define camera_opt      3
+		.name = "video",
+		.has_arg = 1,
+		.flag = NULL,
+	},
 };
 
 static void usage(void)
@@ -46,6 +52,7 @@ static void usage(void)
 	fprintf(stderr, "usage: fll  <options>, with:\n");
 	fprintf(stderr, "--xmlfile=<filepath/filename> 		specifies detector config file (default: ~/cascade.xml)\n");
 	fprintf(stderr, "--output[=<file-tmpl>] 		dump output data (default: discard)\n");
+	fprintf(stderr, "--video[=<camera-index>] 		specifies which camera to use (default: any camera)\n");
 	fprintf(stderr, "--help                 		this help\n");
 }
 
@@ -92,7 +99,7 @@ static void timespec_substract(struct timespec *const diff,
 	}
 }
 
-static void init_skeleton(void)
+static void init_skeleton(int vindex)
 {
 	int ret __attribute__((unused));
 	/* initialize servolib */
@@ -111,6 +118,7 @@ static void teardown_skeleton(void)
 int main(int argc, char *const argv[])
 {
 	const char *outfile, *xmlfile;
+	int video = 0;
 	struct timespec start_time, stop_time, duration;
 	int pos[FLL_MAX_SERVO_COUNT] =
 		{ [0 ... FLL_MAX_SERVO_COUNT -1] = -1};
@@ -139,6 +147,8 @@ int main(int argc, char *const argv[])
 		case output_opt:
 			outfile = optarg;
 			break;
+		case camera_opt:
+			video = atoi(optarg);
 		default:
 			usage();
 			exit(1);
@@ -150,7 +160,7 @@ int main(int argc, char *const argv[])
 		printf("output data:%s.\n", outfile);
 	
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
-	init_skeleton();
+	init_skeleton(video);
 	for (i=0; i < FLL_MAX_SERVO_COUNT; i++)
 		printf("servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
 		       i, pos[i], speed[i], accel[i]);
