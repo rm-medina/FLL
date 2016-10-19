@@ -5,9 +5,12 @@
  * @author Raquel Medina <raquel.medina.rodriguez@gmail.com>
  *
  */
-#include "capture.h"
 #include <errno.h>
 #include <stdio.h>
+#include <malloc.h>
+
+#include "capture.h"
+#include "store.h"
 
 #if defined(HAVE_OPENCV2)
 
@@ -25,7 +28,7 @@ static CvHaarClassifierCascade* cdtHaar_det;
 static CvCapture* videocam;
 static CvMemStorage* scratchbuf;
 
-static int capture_initialize(enum capture_detector_t cdt);
+static int capture_initialize(int vindex, enum capture_detector_t cdt);
 static int capture_get_frame(IplImage* srcframe, int frame_idx);
 static int capture_tear_down(IplImage* dstframe, enum capture_detector_t cdt);
 static int capture_configure_detector(const IplImage* srcframe,
@@ -39,7 +42,7 @@ static CvSeq* capture_run_latentSVM_detector(IplImage* frame,
 static int capture_overlay_bboxes(CvSeq* faces, IplImage* img, int scale);
 
 
-static int capture_initialize(enum capture_detector_t cdt)
+static int capture_initialize(int vindex, enum capture_detector_t cdt)
 {
 	switch(cdt) {
 	case CDT_HAAR:
@@ -57,7 +60,7 @@ static int capture_initialize(enum capture_detector_t cdt)
 		return -EINVAL;
 	};
 	
-	videocam = cvCreateCameraCapture(CV_CAP_ANY); 
+	videocam = cvCreateCameraCapture(CV_CAP_ANY+vindex); 
 	if (!videocam)
 		return -ENODEV;
 
@@ -133,8 +136,8 @@ static CvSeq* capture_run_Haar_detector(IplImage* frame,
 				    1.1, /*default scale factor*/
 				    3,   /*default min neighbors*/
 				    CV_HAAR_DO_CANNY_PRUNING,
-				    cvSize(0, 0),  /*min size*/
-				    cvSize(40, 40) /*max size*/
+				    cvSize(60, 60),  /*min size*/
+				    cvSize(180, 180) /*max size*/
 		); 
 	return faces;  
 }
@@ -167,11 +170,11 @@ static CvSeq* capture_run_detector(IplImage* frame, CvMemStorage* const buf,
 	switch(cdt) {
 	case CDT_HAAR:
 		faces = cvHaarDetectObjects(frame, cdtHaar_det, buf,
-					    1.1, /*default scale factor*/
-					    3,   /*default min neighbors*/
+					    1.2, /*default scale factor: 1.1*/
+					    2,   /*default min neighbors: 3*/
 					    CV_HAAR_DO_CANNY_PRUNING,
-					    cvSize(0, 0),  /*min size*/
-					    cvSize(40, 40) /*max size*/	); 
+					    cvSize(10, 10),  /*min size*/
+					    cvSize(160, 160) /*max size*/	); 
 		break;
 	case CDT_LSVM:
 		faces =	cvLatentSvmDetectObjects(frame, cdtSVM_det,
@@ -182,6 +185,8 @@ static CvSeq* capture_run_detector(IplImage* frame, CvMemStorage* const buf,
 	default:
 		faces = 0;
 	};
+	if (!faces)
+		printf("No face, cdt=%d.\n", cdt);
 	return faces;
 }
 
@@ -189,10 +194,11 @@ static int capture_overlay_bboxes(CvSeq* faces, IplImage* img, int scale)
 {
 	int i;
 	CvPoint ptA, ptB;
-	
+	struct store_box *pos;
 	if (!faces)
 		return -EINVAL;
-	
+	pos = memalign(sizeof(struct store_box), faces->total);
+	printf("%d faces.\n", faces->total);
 	for (i = 0; i < faces->total; i++)
 	{
 		CvRect* rAB = (CvRect*)cvGetSeqElem(faces, i);
@@ -201,36 +207,45 @@ static int capture_overlay_bboxes(CvSeq* faces, IplImage* img, int scale)
 		ptA.y = rAB->y*scale;
 		ptB.y = (rAB->y+rAB->height)*scale;
 		cvRectangle(img, ptA, ptB, CV_RGB(255,0,0), 3, 8, 0 );
+		printf("(%d,%d) and (%d,%d).\n", ptA.x, ptA.y, ptB.x, ptB.y);
+		if (!pos)
+			continue;
+		pos[i].ptA_x = ptA.x;
+		pos[i].ptA_y = ptA.y;
+		pos[i].ptB_x = ptA.x;
+		pos[i].ptB_y = ptA.y;
 	}
 	cvShowImage("FLL detection", (CvArr*)img);
 	return 0;
 }
 
-int capture_process(enum capture_detector_t cdt, int scale)
+int capture_process(int vindex, enum capture_detector_t cdt, int scale)
 {
 	IplImage* srcframe, *dstframe;
 	CvSeq* faces;
 	int n, ret;
 	
-	ret = capture_initialize(cdt);
+	ret = capture_initialize(vindex, cdt);
 	if (ret < 0)
 		return ret;
 
 	srcframe = 0;
 	dstframe = 0;	
 	for (n=0; ; n++) {
+		printf("%s: step1 get frame.\n", __func__);
 		ret = capture_get_frame(srcframe, n);
 		if (ret < 0)
 			break;
 
+		printf("%s: step2 configure.\n", __func__);
 		ret = capture_configure_detector(srcframe, dstframe, cdt);
 		if (ret < 0)
 			break;
-		
+		printf("%s: step3 run detector on frame.\n", __func__);
 		faces = capture_run_detector(dstframe, scratchbuf, cdt);
 		if (!faces)
 			continue;
-
+		printf("%s: step4 draw bboxes on frame.\n", __func__);
 		ret = capture_overlay_bboxes(faces, dstframe, scale);
 	}
 
@@ -250,7 +265,7 @@ int capture_get_facecount(void)
 	return 0;
 }
 
-int capture_read_locations(struct capturebox *faceset)
+int capture_read_locations(struct store_box *faceset)
 {
 	faceset = 0;
 	return -ENODEV;

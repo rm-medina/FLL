@@ -11,16 +11,8 @@ enum capture_detector_t {
 	CDT_UNKNOWN = 2,
 };
 
-struct capture_box {
-	int ptA_x;
-	int ptA_y;
-	int ptB_x;
-	int ptB_y;
-};
-
-int capture_process(enum capture_detector_t cdt, int scale);
+int capture_process(int vindex, enum capture_detector_t cdt, int scale);
 int capture_get_facecount(void);
-int capture_read_locations(struct capture_box *face);
 
 #ifdef __cplusplus
 }
