@@ -99,11 +99,12 @@ int main(int argc, char *const argv[])
 				    1.2, /*default scale factor: 1.1*/
 				    2,   /*default min neighbors: 3*/
 				    CV_HAAR_DO_CANNY_PRUNING,
-				    cvSize(10, 10),  /*min size*/
-				    cvSize(160, 160) /*max size*/
+				    cvSize(60, 60),  /*min size*/
+				    cvSize(180, 180) /*max size*/
 			); 
 		if (!faces)
 			printf("No faces.\n");
+		printf("%d faces.\n", faces->total);
 		for (i = 0; i < faces->total; i++) {
 			CvRect* rAB = (CvRect*)cvGetSeqElem(faces, i);
 			CvPoint ptA, ptB;
@@ -114,6 +115,9 @@ int main(int argc, char *const argv[])
 			ptB.y = (rAB->y+rAB->height)*scale;
 			cvRectangle(dstframe, ptA, ptB, CV_RGB(255,0,0),
 				    3, 8, 0 );
+			printf("(%d,%d) and (%d,%d).\n", ptA.x, ptA.y,
+			       ptB.x, ptB.y);
+
 		}
 		cvShowImage("FLL detection test", (CvArr*)dstframe);
 
