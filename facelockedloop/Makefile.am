@@ -28,7 +28,11 @@ test_BGR2GRAY_LDADD = \
 	$(fll_LDADD)
 
 fll_SOURCES = \
-	main.c	
+	main.c	\
+	pipeline.c \
+	capture.c \
+	detect.c \
+	store.c
 
 fll_CPPFLAGS =		\
 	@FLL_CFLAGS@ @FLL_EXTRA_CFLAGS@	\
