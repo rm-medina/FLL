@@ -2,13 +2,7 @@
 #define __SERVOLIB_H_
 
 #define SERVOLIB_MAX_SERVO_COUNT 6
-
-struct servo_params {
-	int channel;
-	int position;
-	int accel_limit;
-	int speed_limit;
-};
+#define SERVOLIB_NUM_SERVO_CMDS 5
 
 enum servo_cmd{
 	SERVOIO_RESET,
@@ -16,6 +10,28 @@ enum servo_cmd{
 	SERVOIO_READ,
 	SERVOIO_CONFIG,
 	SERVOIO_WRITE,
+	SERVOIO_NUM_CMDS,
+};
+
+struct servo_stats {
+	int channel;
+	int min_pos;
+	int max_pos;
+	int min_poserr;
+	int max_poserr;
+	enum servo_cmd lastcmd;
+	int cmdstally[SERVOLIB_NUM_SERVO_CMDS];
+};
+
+struct servo_params {
+	int channel;
+	int position;
+	int home_position;
+	int min_position;
+	int max_position;
+	int poserr;
+	int accel_limit;
+	int speed_limit;
 };
 
 #ifdef __cplusplus
