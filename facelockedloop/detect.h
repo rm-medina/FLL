@@ -5,27 +5,59 @@
 extern "C" {
 #endif
 
+#if defined(HAVE_OPENCV2)
+#include "highgui/highgui_c.h"
+#endif
+  
 enum object_detector_t {
 	CDT_HAAR = 0,
 	CDT_LSVM = 1,
 	CDT_UNKNOWN = 2,
 };
 
-struct store_box;
-	
 #if defined(HAVE_OPENCV2)
-	int detect_initialize(IplImage* srcframe, enum object_detector_t cdt);
+
+struct detector_params {
+	enum object_detector_t odt;
+	char *cascade_xml;
+	IplImage* srcframe;
+	IplImage* dstframe;
+	void *algorithm;
+	CvMemStorage* scratchbuf;
+};
+
 #else
-	int detect_initialize(void* srcframe, enum object_detector_t cdt);
+struct detector_params {
+	enum object_detector_t odt;
+	char *cascade_xml;
+	void* srcframe;
+	void* dstframe;
+	void *algorithm;
+	void *scratchbuf;
+};
+
 #endif
-	
-int detect_teardown(enum object_detector_t cdt);
 
-int detect_run(struct store_box *boxes, const IplImage* srcframe,
-	       enum object_detector_t cdt);
+struct detector_stats {
+	int frameidx;
+	int facecount;
+};
 
-int detect_get_objcount(void);
+struct detector {
+	struct stage *step;
+	struct detector_params params;
+	struct detector_stats stats;
+	int status;
+};
+  
+int detect_initialize(struct detector *d, struct detector_params *p);
+int detect_teardown(struct detector *d);
+int detect_run(struct detector *d);
+int detect_get_objcount(struct detector *d);
+int detect_print_stats(struct detector *d);
 
 #ifdef __cplusplus
 }
 #endif
+
+#endif  /* __DETECT_H_ */

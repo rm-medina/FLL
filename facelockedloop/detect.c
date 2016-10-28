@@ -8,43 +8,19 @@
 #include <errno.h>
 #include <stdio.h>
 #include <malloc.h>
-
 #include "detect.h"
 #include "store.h"
 
 #if defined(HAVE_OPENCV2)
-
 #include "highgui/highgui_c.h"
 #include "imgproc/imgproc_c.h"
 #include "objdetect/objdetect.hpp"
-
-struct detector_stats {
-	int frameidx;
-	int facecount;
-};
-
-struct detector_params {
-	enum object_detector_t odt;
-	char *cascade_xml;
-	IplImage* srcframe;
-	IplImage* dstframe;
-	void *algorithm;
-	CvMemStorage* scratchbuf;
-};
-
-struct detector {
-	struct stage *step;
-	struct detector_params params;
-	struct detector_stats;
-	int status;
-};
 
 static CvSeq* detect_run_Haar_algorithm(IplImage* frame,
 					CvMemStorage* const buffer);
 static CvSeq* detect_run_latentSVM_algorithm(IplImage* frame,
 					     CvMemStorage* const buffer);
 static int detect_store(CvSeq* faces, IplImage* img, int scale);
-
 
 /*
  * cascade_xml is the trained detector filter definition, which loads 
@@ -54,7 +30,8 @@ int detect_initialize(struct detector *d, struct detector_params *p)
 {
 	CvLatentSvmDetector* cdtSVM_det;
 	CvHaarClassifierCascade* cdtHaar_det;
-
+	int ret = 0;
+	
 	d->params = *p;
 	
 	switch(d->params.odt) {
@@ -82,7 +59,9 @@ int detect_initialize(struct detector *d, struct detector_params *p)
 	d->params.scratchbuf = cvCreateMemStorage(0); /*block_size: 0->64K*/
 	if (d->params.scratchbuf == NULL)
 		return -ENOMEM;
-	return 0;
+
+	ret = stager_init(p->step, p->step->params, &step->ops, pipe);
+	return ret;
 }
 
 void detect_teardown(struct detector *d)
@@ -95,9 +74,7 @@ void detect_teardown(struct detector *d)
 		cvReleaseMemStorage(&(d->params.scratchbuf));
 }
 
-int detect_run(struct store_box *boxes,
-		      const IplImage* srcframe,
-		      enum object_detector_t cdt)
+int detect_run(struct detector *d)
 {
 	CvSeq* faces;
 
@@ -142,15 +119,11 @@ int detect_run(struct store_box *boxes,
 		faces = 0;
 	};
 	if (!faces)
-		printf("No face, cdt=%d.\n", cdt);
+		printf("No face, cdt=%d.\n", d->params.odt);
 	else
 		detect_store(faces, d->params.dstframe, 1);
 	return 0;
 
-
-
-
-	return 0;
 }
 
 static CvSeq* detect_run_Haar_algorithm(IplImage* frame,
@@ -217,3 +190,33 @@ static int detect_store(CvSeq* faces, IplImage* img, int scale);
 	cvShowImage("FLL detection", (CvArr*)img);
 	return 0;
 }
+
+#else
+
+int detect_initialize(struct detector *d, struct detector_params *p)
+{
+	return -ENODEV;
+}
+	
+int detect_run(struct detector *d)
+{
+	return -EINVAL;
+}
+	
+void detect_teardown(struct detector *d)
+{
+	return;
+}
+
+#endif 
+
+int detect_print_stats(struct detector *d)
+{
+	return 0;
+}
+
+int detect_get_objcount(struct detector *d)
+{
+	return 0;
+}
+
