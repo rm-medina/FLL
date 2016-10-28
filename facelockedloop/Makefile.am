@@ -32,7 +32,7 @@ fll_SOURCES = \
 	pipeline.c \
 	capture.c \
 	detect.c \
-	store.c
+	track.c
 
 fll_CPPFLAGS =		\
 	@FLL_CFLAGS@ @FLL_EXTRA_CFLAGS@	\
