@@ -5,18 +5,46 @@
 extern "C" {
 #endif
 
-int capture_initialize(int vindex);
-	
 #if defined(HAVE_OPENCV2)
-	int capture_run(IplImage* srcframe, int frame_idx);
-#else 
-	int capture_run(void* srcframe, int frame_idx);
+#include "highgui/highgui_c.h"
+
+struct imager_params {
+	char* name;
+	int vididx;
+	int frameidx;
+	IplImage* frame;
+	CvCapture* videocam;
+};
+
+#else
+struct imager_params {
+	char* name;
+	int vididx;
+	int frameidx;
+	void* frame;
+	void* videocam;
+};
+
 #endif
-	
-void capture_teardown(void);
 
-int capture_get_vindex(void);
+struct imager_stats {
+	int tally;
+	int fps;
+};
 
+struct imager {
+	struct stage *step;
+	struct imager_params params;
+	struct imager_stats stats;
+	int status;
+};
+
+int capture_initialize(struct imager *i, struct imager_params *p);
+int capture_run(struct imager *i);
+void capture_teardown(struct imager *i);
+int capture_get_imgcount(struct imager *i);
+int capture_print_stats (struct imager *i);
+  
 #ifdef __cplusplus
 }
 #endif

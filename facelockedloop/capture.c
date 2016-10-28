@@ -10,99 +10,129 @@
 
 #include "capture.h"
 
+static struct stage_ops capture_ops = {
+	.up = capture_stage_up, 
+	.down = capture_stage_down,
+	.run = capture_stage_run,
+	.wait = capture_stage_wait,
+	.go = capture_stage_go,
+};
+
+static void capture_stage_up(struct stage *stg, struct pipeline *pipe)
+{
+	stage_up();
+	pipeline_register(stg, pipe);
+	
+}
+static void capture_stage_down(struct stage *stg, struct pipeline *pipe)
+{
+	stage_down(stg);
+	pipeline_deregister(stg, pipe);
+}
+
+static void capture_stage_run(struct stage *stg)
+{
+	stage_run(stg);
+}
+
+static void capture_stage_wait(struct stage *stg)
+{
+	stage_wait(stg);
+}
+
+static void capture_stage_go(struct stage *stg)
+{
+	stage_go(stg);
+}
+
+
 #if defined(HAVE_OPENCV2)
 
-#include "highgui/highgui_c.h"
-#define CAMERA_MAX_NUMBER 1
-
-static CvCapture* videocam[CAMERA_MAX_NUMBER];
-static int ncam;
-
-struct imager_stats {
-	int tally;
-	int fps;
-};
-
-struct imager_params {
-	int camidx;
-	IplImage* frame;
-};
-
-struct imager {
-	struct stage *step;
-	struct capture_params params;
-	struct capture_stats;
-	int status;
-};
-
-int capture_initialize(struct imager* i, struct imager_params *p)
+int capture_initialize(struct imager *i, struct imager_params *p,
+		       struct pipeline *pipe)
 {
-	if (ncam >= CAMERA_MAX_NUMBER)
-		return -EINVAL;
-	videocam[ncam] = cvCreateCameraCapture(CV_CAP_ANY + vindex); 
-	if (!videocam[ncam])
-		return -ENODEV;
-	++ncam;
-	cvNamedWindow(sscanf("FLL cam%d",ncam), CV_WINDOW_AUTOSIZE);
-	return ncam;
-}
-
-void capture_teardown(void)
-{
-	int i;
+	struct stage_params stgparams;
+	int ret;
 	
-	for (i=0; i<ncam; i++)
-		cvDestroyWindow(sscanf("FLL cam%d",i));
-}
+	stgparams.nth_stage = CAPTURE_STAGE;
+	stgparams.data_in = NULL;
+	stgparams.data_out = NULL;
 
-int capture_run(int camid, IplImage* srcframe, int frame_idx)
-{
-	if (camid > CAMERA_MAX_NUMBER)
-		return -EINVAL;
-	
-	if (!videocam[camid-1])
+	i->params = *p;
+	i->params.videocam = cvCreateCameraCapture(CV_CAP_ANY +
+						   i->params.vindex); 
+	if (!(i->params.videocam))
 		return -ENODEV;
 
-	if (cvGrabFrame(videocam[camid-1])) {
-		srcframe = cvRetrieveFrame(videocam[camid-1], frame_idx);
+	
+	cvNamedWindow(sscanf("FLL cam%d", i->params.vindex),
+		      CV_WINDOW_AUTOSIZE);
+
+	ret = stage_up(i->step, &stgparams, &capture_ops, pipe);
+	return ret;
+}
+
+void capture_teardown(struct imager *i)
+{
+	cvDestroyWindow(sscanf("FLL cam%d",i->params.vindex));
+}
+
+int capture_run(struct imager *i)
+{
+	if (i->params.vididx < 0)
+		return -EINVAL;
+	
+	if (!(i->params.videocam))
+		return -ENODEV;
+
+	if (cvGrabFrame(i->params.videocam)) {
+		srcframe = cvRetrieveFrame(i->params.videocam,
+					   i->params.frameidx);
 		if (!srcframe)
 			return -EIO;
-		
+
+		i->params.frame = srcframe;
 		printf("cam%d captured %dth image(%p): %dx%d with [%d channels,"
 		       "%d step, %p data.\n",
-		       camid, frame_idx, srcframe, srcframe->height,
-		       srcframe->width, srcframe->nChannels,
+ 		       i->params.vididx , i->params.frameidx, srcframe,
+		       srcframe->height, srcframe->width, srcframe->nChannels,
 		       srcframe->widthStep, srcframe->imageData);
-		cvShowImage(sscanf("FLL cam%d",camid-1), (CvArr*)srcframe);
+		cvShowImage(sscanf("FLL cam%d", i->params.vididx), (CvArr*)srcframe);
+		++(i->stats.tally);
 	}
 	return 0;
 }
 
-int capture_get_camcount(void)
+int capture_get_imgcount(struct imager *i)
 {
-	return ncam;
+	return i->stats.tally;
 }
 
 #else
 
-int capture_initialize(int vindex)
+int capture_initialize(struct imager *i, struct imager_params *p)
 {
 	return -ENODEV;
 }
 	
-int capture_run(void* srcframe, int frame_idx)
+int capture_run(struct imager *i)
 {
 	return -EINVAL;
 }
 	
-void capture_teardown(void)
+void capture_teardown(struct imager *i)
 {
 	return;
 }
 
-int capture_get_camcount(void)
+int capture_get_imgcount(struct imager *i)
 {
 	return 0;
 }
 
 #endif /*HAVE_OPENCV2*/
+
+int capture_print_stats(struct imager *i)
+{
+	return 0;
+}
