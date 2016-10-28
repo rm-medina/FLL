@@ -18,6 +18,9 @@
 extern const char *fll_version_name;
 #define FLL_MAX_SERVO_COUNT SERVOLIB_MAX_SERVO_COUNT
 #define FLL_SERVO_COUNT 2
+struct pipeline pipe;
+
+
 static int with_output;
 static const struct option options[] = {
 	{
@@ -99,22 +102,6 @@ static void timespec_substract(struct timespec *const diff,
 	}
 }
 
-static void init_skeleton(int vindex)
-{
-	int ret __attribute__((unused));
-	/* initialize servolib */
-	/* initialize opencv */
-	/* any other start configuration */
-}
-
-static void teardown_skeleton(void)
-{
-	int ret __attribute__((unused));
-	/* initialize servolib to 0 or home? */
-	/* any opencv specifics? */
-	/* any other finalizing action? */
-}
-
 int main(int argc, char *const argv[])
 {
 	const char *outfile, *xmlfile;
@@ -126,7 +113,13 @@ int main(int argc, char *const argv[])
 		{ [0 ... FLL_MAX_SERVO_COUNT -1] = -1};
 	int accel[FLL_MAX_SERVO_COUNT] =
 		{ [0 ... FLL_MAX_SERVO_COUNT -1] = -1};
-	struct servo_params servo_params[FLL_SERVO_COUNT] __attribute__((unused));
+	struct servo_params servo_ __attribute__((unused));
+	struct imager_params camera_params;
+	struct detector_params algorithm_params;
+	struct imager camera;
+	struct detector algorithm;
+	struct tracker servo;
+	
 	int lindex, c, i;
 	outfile = NULL;
 	xmlfile = NULL;
@@ -158,14 +151,59 @@ int main(int argc, char *const argv[])
 		printf("cascade filter:%s.\n", xmlfile);
 	if (outfile != NULL)
 		printf("output data:%s.\n", outfile);
-	
-	clock_gettime(CLOCK_MONOTONIC, &start_time);
-	init_skeleton(video);
+
+	pipeline_init(pipe);
+	/* first stage */
+	camera_params.name = sscanf("FLL cam%d", video);
+	camera_params.vididx = video;
+	camera_params.camidx = 0;
+	camera_params.frame = NULL;
+	camera_params.videocam = NULL;
+	ret = capture_initialize(&camera, &camera_params, &pipe);
+	if (ret) {
+		printf("capture init ret:%d.\n", ret);
+		goto terminate;
+	}
+	/* second stage */
+	algorithm_params.odt = dtype;
+	algorithm_params.cascade_xml = xmlfile;
+	algorithm_params.srcframe = NULL;
+	algorithm_params.dstframe = NULL;
+	algorithm_params.algorithm = NULL;
+	algorithm_params.scratchbuf = NULL;
+	ret = detect_initialize(&algorithm, &algorithm_params, &pipe);
+	if (ret) {
+		printf("detection init ret:%d.\n", ret);
+		goto terminate;
+	}
+	/* third stage */
+	servo_params.panhome = 0;
+	servo_params.tilthome = 0;
+	ret = track_initialize(&servo , &servo_params, &pipe);
+	if (ret) {
+		printf("tracking init ret:%d.\n", ret);
+		goto terminate;
+	}
+
+	ret =pipeline_getstages(&pipe);
+	if (ret != MAX_PIPELINE_STAGES) {
+		printf("missing stages for fll, only %d present.\n", ret);
+		goto terminate;
+	}
+
 	for (i=0; i < FLL_MAX_SERVO_COUNT; i++)
 		printf("servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
 		       i, pos[i], speed[i], accel[i]);
 
-	teardown_skeleton();
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
+	for (l=0; ret <= 0; l++)  {
+		ret = pipeline_run(&pipe);
+		if (ret) {
+			printf("Cannot run FLL, ret:%d.\n", ret);
+			break;
+		}
+
+	pipeline_teardown(&pipe);
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &start_time, &stop_time);
 	printf("duration->  %lds %ldns .\n", duration.tv_sec , duration.tv_nsec );
