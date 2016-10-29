@@ -1,15 +1,20 @@
-#if defined(HAVE_OPENCV2)
+#include <stdio.h>
+#include <errno.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <string.h>
 
-#include "highgui/highgui_c.h"
-#include "imgproc/imgproc_c.h"
-#include "objdetect/objdetect.hpp"
+#include "pipeline.h"
+#include "time_utils.h"
 
-int stage_up(struct stage *stg, const struct stage_params *p,
+static void *stage_worker(void *arg);
+
+void stage_up(struct stage *stg, struct stage_params *p,
 	     struct stage_ops *o, struct pipeline *pipe)
 {
 	pthread_attr_t attr;
 
-	stg->params = p;
+	stg->params = *p;
 	stg->ops = o;
 	stg->pipeline = pipe;
 	timespec_zero(&stg->duration);
@@ -18,20 +23,19 @@ int stage_up(struct stage *stg, const struct stage_params *p,
 	stg->stats.persecond = 0;
 
 	if (stg->params.nth_stage < PIPELINE_MAX_STAGE)
-		stg->next = &(pipe->stages[stg->params.nth_stage]);
+		stg->next = &(pipe->stgs[stg->params.nth_stage]);
 	else
 		stg->next = NULL; /* end of pipeline */
 
-	sem_init(&stg->nowait);
-	sem_init(&stg->done);
-	mutex_init(&stg->lock);
+	sem_init(&stg->nowait, 0, 0);
+	sem_init(&stg->done, 0, 0);
+	pthread_mutex_init(&stg->lock, NULL);
 	pthread_cond_init(&stg->sync, NULL);
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	pthread_create(&stg->worker, &attr, stage_worker, stg);
-	ptrhead_attr_destroy(&attr);
-	
-	return 0;
+	pthread_attr_destroy(&attr);
+	o->up(stg, p, o, pipe);
 }
 
 static void *stage_worker(void *arg)
@@ -50,12 +54,13 @@ static void *stage_worker(void *arg)
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		ret = step->ops->run(step);
 		clock_gettime(CLOCK_MONOTONIC, &stop);
-		timespec_sub(&step->duration, &stop, &start);
+		timespec_substract(&step->duration, &stop, &start);
 	}
 	if (ret < 0)
 		printf("step %d failed./n", step->params.nth_stage);
 
-	printf("step %d performance: nofinterest=%d./n",
+	printf("step %d performance: nofinterest=%ld./n",
+	       step->params.nth_stage,
 	       step->stats.ofinterest);
 
 	//post to next step
@@ -70,10 +75,10 @@ void stage_go(struct stage *stg)
 
 void stage_wait(struct stage *stg)
 {
-	ret = sem_wait(&stg->done);
+	int ret = sem_wait(&stg->done);
 	if (ret)
 		printf("%s: step %d wait error %d./n",
-		       __func__, step->params.nth_stage, ret);
+		       __func__, stg->params.nth_stage, ret);
 
 }
 
@@ -82,22 +87,23 @@ int stage_passit(struct stage *stg, void *it)
 	struct stage *next = stg->next;
 
 	if (next) {
-		mutex_lock(&next->lock);
+		pthread_mutex_lock(&next->lock);
 		next->params.data_in = it;
-		pthread_cond_signal(next->sync);
-		mutex_unlock(&next->lock);
+		pthread_cond_signal(&next->sync);
+		pthread_mutex_unlock(&next->lock);
 	}
-
+	return 0;
 }
 
 int stage_processit(struct stage *stg, void **it)
 {
-	mutex_lock(&stg->lock);
-	while (stg->params->data_in == NULL)
+	pthread_mutex_lock(&stg->lock);
+	while (stg->params.data_in == NULL)
 		pthread_cond_wait(&stg->sync, &stg->lock);
 
-	mutex_unlock(&stg_lock);
-	it = stg->params->data_in;
+	pthread_mutex_unlock(&stg->lock);
+	*it = stg->params.data_in;
+	return 0;
 }
 	
 void stage_down(struct stage *stg)
@@ -105,14 +111,14 @@ void stage_down(struct stage *stg)
 	pthread_cancel(stg->worker);
 	pthread_join(stg->worker, NULL);
 	pthread_cond_destroy(&stg->sync);
-	mutex_destroy(&stg->lock);
+	pthread_mutex_destroy(&stg->lock);
 	sem_destroy(&stg->nowait);
 	sem_destroy(&stg->done);
 }
 
 void stage_printstats(struct stage *stg)
 {
-	return 0;
+	return;
 }
 
 void pipeline_init(struct pipeline *pipe)
@@ -127,67 +133,60 @@ int pipeline_register(struct pipeline *pipe, struct stage *stg)
 	if (!stg)
 		return -EINVAL;
 	
-	pipe->stgs[stg->params->nth_stage] = stg;
+	pipe->stgs[stg->params.nth_stage] = *stg;
 	++(pipe->count);
 	return 0;	
 }
 
-int pipeline_run(int vindex, enum object_detector_t cdt, int scale)
+int pipeline_deregister(struct pipeline *pipe, struct stage *stg)
 {
-	IplImage* srcframe, *dstframe;
-	CvSeq* faces;
-	int n, ret;
+	if (!stg)
+		return -EINVAL;
 	
-	ret = capture_initialize(vindex, cdt);
-	if (ret < 0)
-		return ret;
+	memset(&pipe->stgs[stg->params.nth_stage], 0, (sizeof(struct stage)));
+	--(pipe->count);
+	return 0;	
+}
 
-	srcframe = 0;
-	dstframe = 0;	
-	for (n=0; ; n++) {
-		printf("%s: step1 get frame.\n", __func__);
-		ret = capture_run(srcframe, n);
+int pipeline_run(struct pipeline *pipe)
+{
+	int l, n, ret;
+	struct stage *s;
+	
+	ret = 0;
+	for (l=0; ; l++) {
+		for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
+			s = &pipe->stgs[CAPTURE_STAGE];
+			printf("%s: run stage %d.\n", __func__,
+			       s->params.nth_stage);
+			ret = s->ops->run(s);
+			if (ret < 0)
+				break;
+		};
+		
 		if (ret < 0)
 			break;
-
-		printf("%s: step2 configure.\n", __func__);
-		ret = capture_configure_detector(srcframe, dstframe, cdt);
-		if (ret < 0)
-			break;
-		printf("%s: step3 run detector on frame.\n", __func__);
-		faces = capture_run_detector(dstframe, scratchbuf, cdt);
-		if (!faces)
-			continue;
-		printf("%s: step4 draw bboxes on frame.\n", __func__);
-		ret = capture_overlay_bboxes(faces, dstframe, scale);
 	}
 
-	capture_tear_down(dstframe, cdt);
 	return ret;
 }
-
-
-#else
-
-int capture_process(enum capture_detector_t cdt, int scale)
-{
-	return -ENODEV;
-}
-
-int capture_get_facecount(void)
-{
-	return 0;
-}
-
-int capture_read_locations(struct store_box *faceset)
-{
-	faceset = 0;
-	return -ENODEV;
-}
-#endif /*HAVE_OPENCV2*/
-
 
 int pipeline_getcount(struct pipeline *pipe)
 {
 	return pipe->count;
+}
+
+void pipeline_teardown(struct pipeline *pipe)
+{
+	struct stage *s;
+	int n;
+	
+	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
+		s = &pipe->stgs[CAPTURE_STAGE];
+		if (s->self) {
+			printf("%s: run stage %d.\n", __func__,
+			       s->params.nth_stage);
+			s->ops->down(s);
+		};
+	};
 }
