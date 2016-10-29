@@ -1,6 +1,7 @@
 #ifndef __TRACK_H_
 #define __TRACK_H_
 
+#include "pipeline.h"
 #include "servolib.h"
 
 #ifdef __cplusplus
@@ -14,6 +15,7 @@ struct tracker_stats {
 };
 
 struct tracker_params {
+	int dev;
 	int pan_tgt;
 	int tilt_tgt;
 	struct servo_params pan_params;
@@ -21,15 +23,15 @@ struct tracker_params {
 };
 
 struct tracker {
-	struct stage *step;
+	struct stage step;
 	struct tracker_params params;
 	struct tracker_stats stats;
-	int dev;
 	int status;
 };
 
-int track_initialize(struct tracker *t, struct tracker_params *p);
-int track_teardown(struct tracker *t);
+int track_initialize(struct tracker *t, struct tracker_params *p,
+		     struct pipeline *pipe);
+void track_teardown(struct tracker *t);
 int track_run(struct tracker *t);
 int track_get_max_abse(struct tracker *t);
 int track_print_stats(struct tracker *t);
