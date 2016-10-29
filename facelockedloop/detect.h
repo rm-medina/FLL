@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include "pipeline.h"
+
 #if defined(HAVE_OPENCV2)
 #include "highgui/highgui_c.h"
 #endif
@@ -44,14 +46,15 @@ struct detector_stats {
 };
 
 struct detector {
-	struct stage *step;
+	struct stage step;
 	struct detector_params params;
 	struct detector_stats stats;
 	int status;
 };
   
-int detect_initialize(struct detector *d, struct detector_params *p);
-int detect_teardown(struct detector *d);
+int detect_initialize(struct detector *d, struct detector_params *p,
+		      struct pipeline *pipe);
+void detect_teardown(struct detector *d);
 int detect_run(struct detector *d);
 int detect_get_objcount(struct detector *d);
 int detect_print_stats(struct detector *d);
