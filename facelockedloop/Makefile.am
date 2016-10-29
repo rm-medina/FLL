@@ -36,18 +36,19 @@ fll_SOURCES = \
 
 fll_CPPFLAGS =		\
 	@FLL_CFLAGS@ @FLL_EXTRA_CFLAGS@	\
-	-I$(top_srcdir)/include
+	-I$(top_srcdir)/include		
+
 
 fll_LDFLAGS = @FLL_LDFLAGS@
 
 fll_LDADD =		\
+	../servolib/libservolib.la \
 	-lpthread -lrt
 
 if USEOPENCV
 if HAVE_OPENCV2
 fll_CPPFLAGS +=  @opencvinc@ -DHAVE_OPENCV2 
 fll_LDFLAGS = -L @opencvlib@
-fll_SOURCES += capture.c
 fll_LDADD += @OPENCV_ADD_LDFLAG@
 endif
 endif

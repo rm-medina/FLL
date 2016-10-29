@@ -5,10 +5,12 @@
 
 #define FLL_MICROSECONDS_IN_SECOND 1000000
 #define FLL_NANOSECONDS_IN_SECOND 1000000000
-#define FLL_MICROSECONS_IN_MILISECOND 1000
+#define FLL_MICROSECONDS_IN_MILISECOND 1000
 #define FLL_NANOSECONDS_IN_MILISECOND 1000000
+#define FLL_MILISECONDS_IN_SECOND 1000
+#define FLL_NANOSECONDS_IN_MICROSECOND 1000
 
-static inline void timeval_zero(struct timespec *r)
+static inline void timeval_zero(struct timeval *r)
 {
 	r->tv_sec = 0;
 	r->tv_usec = 0;
@@ -44,11 +46,11 @@ static inline void timeval_add(struct timeval *r,
 	r->tv_usec += t->tv_usec;
 	if (r->tv_usec >= FLL_MICROSECONDS_IN_SECOND) {
 		r->tv_sec++;
-		r->tv_usec -= FLL_MICROSECONS_IN_SECOND;
+		r->tv_usec -= FLL_MICROSECONDS_IN_SECOND;
 	}
 }
 
-static inline unsigned long timespec_usecs(struct timeval *t)
+static inline unsigned long timeval_usecs(struct timeval *t)
 {
 	return t->tv_sec * FLL_MICROSECONDS_IN_SECOND + t->tv_usec;
 }
@@ -66,7 +68,7 @@ static inline void timespec_zero(struct timespec *r)
 	r->tv_nsec = 0;
 }
 
-static inline void timespec_substract(struct timespec *const r,
+static inline int timespec_substract(struct timespec *const r,
 			       const struct timespec *const t1,
 			       const struct timespec *const t2)
 {
@@ -96,7 +98,7 @@ static inline void timespec_add(struct timespec *r,
 	r->tv_nsec += t->tv_nsec;
 	if (r->tv_nsec >= FLL_NANOSECONDS_IN_SECOND) {
 		r->tv_sec++;
-		r->tv_nsec -=NANOSECONS_IN_SECOND;
+		r->tv_nsec -= FLL_NANOSECONDS_IN_SECOND;
 	}
 }
 
