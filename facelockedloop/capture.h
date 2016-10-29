@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include "pipeline.h"
+
 #if defined(HAVE_OPENCV2)
 #include "highgui/highgui_c.h"
 
@@ -33,13 +35,16 @@ struct imager_stats {
 };
 
 struct imager {
-	struct stage *step;
+	struct stage step;
 	struct imager_params params;
 	struct imager_stats stats;
 	int status;
 };
 
-int capture_initialize(struct imager *i, struct imager_params *p);
+struct pipeline;
+  
+int capture_initialize(struct imager *i, struct imager_params *p,
+		       struct pipeline *pipe);
 int capture_run(struct imager *i);
 void capture_teardown(struct imager *i);
 int capture_get_imgcount(struct imager *i);

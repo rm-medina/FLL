@@ -7,8 +7,17 @@
  */
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "capture.h"
+#include "kernel_utils.h"
+
+static void capture_stage_up(struct stage *stg, struct stage_params *p,
+			     struct stage_ops *o,struct pipeline *pipe);
+static void capture_stage_down(struct stage *stg);
+static int capture_stage_run(struct stage *stg);
+static void capture_stage_wait(struct stage *stg);
+static void capture_stage_go(struct stage *stg);
 
 static struct stage_ops capture_ops = {
 	.up = capture_stage_up, 
@@ -18,21 +27,30 @@ static struct stage_ops capture_ops = {
 	.go = capture_stage_go,
 };
 
-static void capture_stage_up(struct stage *stg, struct pipeline *pipe)
+static void capture_stage_up(struct stage *stg, struct stage_params *p,
+			     struct stage_ops *o,struct pipeline *pipe)
 {
-	stage_up();
-	pipeline_register(stg, pipe);
+	stage_up(stg, p, o, pipe);
+	pipeline_register(pipe, stg);
 	
 }
-static void capture_stage_down(struct stage *stg, struct pipeline *pipe)
+
+static void capture_stage_down(struct stage *stg)
 {
+	struct imager *imgr;
+
+	imgr = container_of(stg, struct imager, step);
+	capture_teardown(imgr);
 	stage_down(stg);
-	pipeline_deregister(stg, pipe);
+	pipeline_deregister(stg->pipeline, stg);
 }
 
-static void capture_stage_run(struct stage *stg)
+static int capture_stage_run(struct stage *stg)
 {
-	stage_run(stg);
+	struct imager *imgr;
+
+	imgr = container_of(stg, struct imager, step);
+	return capture_run(imgr);
 }
 
 static void capture_stage_wait(struct stage *stg)
@@ -46,12 +64,13 @@ static void capture_stage_go(struct stage *stg)
 }
 
 
-#if defined(HAVE_OPENCV2)
+#if HAVE_OPENCV2
 
 int capture_initialize(struct imager *i, struct imager_params *p,
 		       struct pipeline *pipe)
 {
 	struct stage_params stgparams;
+	char *wname;
 	int ret;
 	
 	stgparams.nth_stage = CAPTURE_STAGE;
@@ -60,25 +79,35 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 
 	i->params = *p;
 	i->params.videocam = cvCreateCameraCapture(CV_CAP_ANY +
-						   i->params.vindex); 
+						   i->params.vididx); 
 	if (!(i->params.videocam))
 		return -ENODEV;
 
+	ret = asprintf(&wname, "FLL cam%d", i->params.vididx);
+	if (ret < 0)
+		return -ENOMEM;
 	
-	cvNamedWindow(sscanf("FLL cam%d", i->params.vindex),
-		      CV_WINDOW_AUTOSIZE);
+	cvNamedWindow(wname, CV_WINDOW_AUTOSIZE);
 
-	ret = stage_up(i->step, &stgparams, &capture_ops, pipe);
+	capture_stage_up(&i->step, &stgparams, &capture_ops, pipe);
 	return ret;
 }
 
 void capture_teardown(struct imager *i)
 {
-	cvDestroyWindow(sscanf("FLL cam%d",i->params.vindex));
+	char *wname;
+	int ret;
+	ret = asprintf(&wname, "FLL cam%d", i->params.vididx);
+	if (!ret)
+		cvDestroyWindow(wname);
 }
 
 int capture_run(struct imager *i)
 {
+	IplImage *srcframe;
+	char* wname;
+	int ret;
+	
 	if (i->params.vididx < 0)
 		return -EINVAL;
 	
@@ -97,7 +126,9 @@ int capture_run(struct imager *i)
  		       i->params.vididx , i->params.frameidx, srcframe,
 		       srcframe->height, srcframe->width, srcframe->nChannels,
 		       srcframe->widthStep, srcframe->imageData);
-		cvShowImage(sscanf("FLL cam%d", i->params.vididx), (CvArr*)srcframe);
+		ret = asprintf(&wname, "FLL cam%d", i->params.vididx);
+		if (!ret)
+			cvShowImage(wname, (CvArr*)srcframe);
 		++(i->stats.tally);
 	}
 	return 0;
@@ -110,7 +141,8 @@ int capture_get_imgcount(struct imager *i)
 
 #else
 
-int capture_initialize(struct imager *i, struct imager_params *p)
+int capture_initialize(struct imager *i, struct imager_params *p,
+		       struct pipeline *pipe)
 {
 	return -ENODEV;
 }
