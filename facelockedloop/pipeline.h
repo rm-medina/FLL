@@ -28,8 +28,8 @@ struct stage_ops {
 	void (*down)(struct stage *stg);
 	void (*go)(struct stage *stg);
 	void (*wait)(struct stage *stg);
-	int (*passit)(struct stage *stg, void *it);
-	int (*processit)(struct stage *stg, void **it);
+	int (*output)(struct stage *stg, void *it);
+	int (*input)(struct stage *stg, void **it);
 	int (*count)(struct stage *step);
 	void (*printstats)(struct stage *step);
 };
@@ -58,12 +58,12 @@ void stage_up(struct stage *stg,  struct stage_params *p,
 void stage_down(struct stage *stg);	
 void stage_go(struct stage *stg);
 void stage_wait(struct stage *stg); 
-int stage_passit(struct stage *stg, void *it);
-int stage_processit(struct stage *stg, void **it);
+int stage_output(struct stage *stg, void *it);
+int stage_input(struct stage *stg, void **it);
 void stage_printstats(struct stage *stg);
 
 struct pipeline {
-	struct stage stgs[PIPELINE_MAX_STAGE];
+	struct stage *stgs[PIPELINE_MAX_STAGE];
 	int count;
 	int status;
 };
@@ -73,6 +73,7 @@ int pipeline_register(struct pipeline *pipe, struct stage *stg);
 int pipeline_deregister(struct pipeline *pipe, struct stage *stg);
 void pipeline_teardown(struct pipeline *pipe);
 int pipeline_run(struct pipeline *pipe);
+int pipeline_pause(struct pipeline *pipe);
 int pipeline_printstats(struct pipeline *pipe);
 int pipeline_getcount(struct pipeline *pipe);
 

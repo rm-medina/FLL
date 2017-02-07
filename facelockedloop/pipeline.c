@@ -21,12 +21,7 @@ void stage_up(struct stage *stg, struct stage_params *p,
 	timespec_zero(&stg->stats.lastrun);
 	stg->stats.ofinterest = 0;
 	stg->stats.persecond = 0;
-
-	if (stg->params.nth_stage < PIPELINE_MAX_STAGE)
-		stg->next = &(pipe->stgs[stg->params.nth_stage]);
-	else
-		stg->next = NULL; /* end of pipeline */
-
+	stg->next = NULL;
 	sem_init(&stg->nowait, 0, 0);
 	sem_init(&stg->done, 0, 0);
 	pthread_mutex_init(&stg->lock, NULL);
@@ -35,7 +30,6 @@ void stage_up(struct stage *stg, struct stage_params *p,
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	pthread_create(&stg->worker, &attr, stage_worker, stg);
 	pthread_attr_destroy(&attr);
-	o->up(stg, p, o, pipe);
 }
 
 static void *stage_worker(void *arg)
@@ -46,25 +40,32 @@ static void *stage_worker(void *arg)
 	
 	for (;;)
 	{
-		//wait_for_previous_step
+		/*wait for 'go' signal*/
 		ret = sem_wait(&step->nowait);
 		if (ret)
-			printf("step %d wait error %d./n",
+			printf("step %d wait error %d.\n",
 			       step->params.nth_stage, ret);
 		clock_gettime(CLOCK_MONOTONIC, &start);
+		if (step->ops->input)
+			ret = step->ops->input(step, NULL);
+		if (ret)
+			printf("step %d input error %d.\n",
+			       step->params.nth_stage, ret);
 		ret = step->ops->run(step);
+		if (ret)
+			printf("step %d run error %d.\n",
+			       step->params.nth_stage, ret);
 		clock_gettime(CLOCK_MONOTONIC, &stop);
 		timespec_substract(&step->duration, &stop, &start);
+		sem_post(&step->done);
 	}
 	if (ret < 0)
-		printf("step %d failed./n", step->params.nth_stage);
+		printf("step %d failed.\n", step->params.nth_stage);
 
-	printf("step %d performance: nofinterest=%ld./n",
+	printf("step %d performance: nofinterest=%ld.\n",
 	       step->params.nth_stage,
 	       step->stats.ofinterest);
 
-	//post to next step
-	sem_post(&step->done);
 	return NULL;
 }
 
@@ -77,12 +78,12 @@ void stage_wait(struct stage *stg)
 {
 	int ret = sem_wait(&stg->done);
 	if (ret)
-		printf("%s: step %d wait error %d./n",
+		printf("%s: step %d wait error %d.\n",
 		       __func__, stg->params.nth_stage, ret);
 
 }
 
-int stage_passit(struct stage *stg, void *it)
+int stage_output(struct stage *stg, void *it)
 {
 	struct stage *next = stg->next;
 
@@ -95,14 +96,14 @@ int stage_passit(struct stage *stg, void *it)
 	return 0;
 }
 
-int stage_processit(struct stage *stg, void **it)
+int stage_input(struct stage *stg, void **it)
 {
 	pthread_mutex_lock(&stg->lock);
 	while (stg->params.data_in == NULL)
 		pthread_cond_wait(&stg->sync, &stg->lock);
 
-	pthread_mutex_unlock(&stg->lock);
 	*it = stg->params.data_in;
+	pthread_mutex_unlock(&stg->lock);
 	return 0;
 }
 	
@@ -125,15 +126,20 @@ void pipeline_init(struct pipeline *pipe)
 {
 	pipe->count = 0;
 	pipe->status = 0;
-	memset(pipe->stgs, 0, PIPELINE_MAX_STAGE * (sizeof(struct stage)));
+	memset(pipe->stgs, 0, PIPELINE_MAX_STAGE);
 }
 
 int pipeline_register(struct pipeline *pipe, struct stage *stg)
 {
 	if (!stg)
 		return -EINVAL;
-	
-	pipe->stgs[stg->params.nth_stage] = *stg;
+
+	pipe->stgs[stg->params.nth_stage] = stg;
+
+	if (stg->params.nth_stage > 0)
+		if (stg->params.nth_stage <= PIPELINE_MAX_STAGE)
+			pipe->stgs[stg->params.nth_stage-1]->next = stg;
+
 	++(pipe->count);
 	return 0;	
 }
@@ -143,31 +149,47 @@ int pipeline_deregister(struct pipeline *pipe, struct stage *stg)
 	if (!stg)
 		return -EINVAL;
 	
-	memset(&pipe->stgs[stg->params.nth_stage], 0, (sizeof(struct stage)));
+	pipe->stgs[stg->params.nth_stage] = NULL;
 	--(pipe->count);
 	return 0;	
 }
 
 int pipeline_run(struct pipeline *pipe)
 {
-	int l, n, ret;
+	int n, ret;
 	struct stage *s;
 	
 	ret = 0;
-	for (l=0; ; l++) {
-		for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
-			s = &pipe->stgs[CAPTURE_STAGE];
-			printf("%s: run stage %d.\n", __func__,
-			       s->params.nth_stage);
-			ret = s->ops->run(s);
-			if (ret < 0)
-				break;
-		};
-		
-		if (ret < 0)
+	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
+		s = pipe->stgs[n];
+		printf("%s: run stage %d in:%p %p.\n", __func__,
+		       s->params.nth_stage, s->params.data_in,
+		       s->params.data_out);
+		s->ops->go(s);
+		ret = sem_wait(&s->done);
+		if (ret) {
+			printf("step %d done error %d.\n",
+			       s->params.nth_stage, ret);
 			break;
-	}
+		}
+		if (s->ops->output && s->next) 
+			s->ops->output(s, s->params.data_out);
+	};
+	return ret;
+}
 
+int pipeline_pause(struct pipeline *pipe)
+{
+	int n, ret;
+	struct stage *s;
+	
+	ret = 0;
+	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
+		s = pipe->stgs[n];
+		printf("%s: pause stage %d.\n", __func__,
+		       s->params.nth_stage);
+		s->ops->wait(s);
+	};
 	return ret;
 }
 
@@ -182,7 +204,7 @@ void pipeline_teardown(struct pipeline *pipe)
 	int n;
 	
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
-		s = &pipe->stgs[CAPTURE_STAGE];
+		s = pipe->stgs[CAPTURE_STAGE];
 		if (s->self) {
 			printf("%s: run stage %d.\n", __func__,
 			       s->params.nth_stage);
