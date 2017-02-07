@@ -26,6 +26,7 @@ struct detector_params {
 	IplImage* dstframe;
 	void *algorithm;
 	CvMemStorage* scratchbuf;
+	struct store_box *faceboxs;
 };
 
 #else
@@ -36,6 +37,7 @@ struct detector_params {
 	void* dstframe;
 	void *algorithm;
 	void *scratchbuf;
+	struct store_box *faceboxs;
 };
 
 #endif

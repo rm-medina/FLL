@@ -23,7 +23,7 @@ static CvSeq* detect_run_Haar_algorithm(IplImage* frame,
 static CvSeq* detect_run_latentSVM_algorithm(IplImage* frame,
 					     CvMemStorage* const buffer,
 					     void *algo);
-static int detect_store(CvSeq* faces, IplImage* img, int scale);
+static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale);
 #endif
 
 static void detect_stage_up(struct stage *stg, struct stage_params *p,
@@ -32,6 +32,8 @@ static void detect_stage_down(struct stage *stg);
 static int detect_stage_run(struct stage *stg);
 static void detect_stage_wait(struct stage *stg);
 static void detect_stage_go(struct stage *stg);
+static int detect_stage_output(struct stage *stg, void* it);
+static int detect_stage_input(struct stage *stg, void** it);
 
 static struct stage_ops detect_ops = {
 	.up = detect_stage_up, 
@@ -39,6 +41,8 @@ static struct stage_ops detect_ops = {
 	.run = detect_stage_run,
 	.wait = detect_stage_wait,
 	.go = detect_stage_go,
+	.output = detect_stage_output,
+	.input = detect_stage_input,
 };
 
 static void detect_stage_up(struct stage *stg, struct stage_params *p,
@@ -62,9 +66,15 @@ static void detect_stage_down(struct stage *stg)
 static int detect_stage_run(struct stage *stg)
 {
 	struct detector *algo;
-
+	int ret;
 	algo = container_of(stg, struct detector, step);
-	return detect_run(algo);
+	if (!algo)
+		return -EINVAL;
+	
+	ret = detect_run(algo);
+	/* pass only first face detected to next stage */
+	stg->params.data_out = &algo->params.faceboxs[0];
+	return ret;
 }
 
 static void detect_stage_wait(struct stage *stg)
@@ -77,6 +87,22 @@ static void detect_stage_go(struct stage *stg)
 	stage_go(stg);
 }
 
+static int detect_stage_output(struct stage *stg, void* it)
+{
+	return stage_output(stg, stg->params.data_out);
+}
+
+static int detect_stage_input(struct stage *stg, void **it)
+{
+	void *itin = NULL;
+	struct detector *algo;
+
+	algo = container_of(stg, struct detector, step);
+	stage_input(stg, &itin);
+
+	algo->params.srcframe = itin;
+	return 0;
+}
 
 #if defined(HAVE_OPENCV2)
 
@@ -98,10 +124,14 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 
 	d->params = *p;
 	
+	d->params.scratchbuf = cvCreateMemStorage(0); /*block_size: 0->64K*/
+	if (d->params.scratchbuf == NULL)
+		return -ENOMEM;
+	
 	switch(d->params.odt) {
 	case CDT_HAAR:
 		if (p->cascade_xml == NULL)
-			p->cascade_xml = "../cascade_frontalfrace_default.xml";
+			p->cascade_xml = "haarcascade_frontalface_default.xml";
 		cdtHaar_det =
 			(CvHaarClassifierCascade*)cvLoad(d->params.cascade_xml, 0, 0, 0 );
 		if (!cdtHaar_det)
@@ -120,9 +150,7 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 		return -EINVAL;
 	};
 
-	d->params.scratchbuf = cvCreateMemStorage(0); /*block_size: 0->64K*/
-	if (d->params.scratchbuf == NULL)
-		return -ENOMEM;
+
 
 	detect_stage_up(&d->step, &stgparams, &detect_ops, pipe);
 	return ret;
@@ -130,8 +158,9 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 
 void detect_teardown(struct detector *d)
 {
-	if (d->params.odt == CDT_HAAR)
-		cvDestroyWindow("FLL Grey");
+	cvDestroyWindow("FLL Display");
+	cvDestroyWindow("FLL Detection");
+
 	if (d->params.dstframe)
 		cvReleaseImage(&(d->params.dstframe));
 	if (d->params.scratchbuf)
@@ -145,22 +174,21 @@ int detect_run(struct detector *d)
 	if (!d->params.scratchbuf)
 		return -ENOMEM;
 
-	cvClearMemStorage(d->params.scratchbuf);
+	cvNamedWindow("FLL detection", CV_WINDOW_AUTOSIZE);
+
 	d->params.dstframe = cvCreateImage(cvSize(d->params.srcframe->width,
 						  d->params.srcframe->height),
-					   d->params.srcframe->depth,
-					   d->params.srcframe->nChannels);
+					   d->params.srcframe->depth, 1);
 	if (d->params.dstframe == NULL)
 		return -ENOMEM;
 
 	switch(d->params.odt) {
 	case CDT_HAAR:
 		/* grey image only be needed for Haar */
-		cvCvtColor(d->params.srcframe->imageData,
-			   d->params.dstframe->imageData,
+		cvCvtColor(d->params.srcframe,
+			   d->params.dstframe,
 			   CV_BGR2GRAY);
-		cvNamedWindow("FLL Grey", CV_WINDOW_AUTOSIZE);
-		cvShowImage("FLL Grey", (CvArr*)(d->params.dstframe));
+		cvClearMemStorage(d->params.scratchbuf);
 		faces = cvHaarDetectObjects(d->params.dstframe,
 					    (CvHaarClassifierCascade*)(
 						    d->params.algorithm),
@@ -185,7 +213,10 @@ int detect_run(struct detector *d)
 	if (!faces)
 		printf("No face, cdt=%d.\n", d->params.odt);
 	else
-		detect_store(faces, d->params.dstframe, 1);
+		d->params.faceboxs = detect_store(faces, d->params.dstframe, 1);
+
+	cvShowImage("FLL detection", (CvArr*)(d->params.dstframe));
+
 	return 0;
 
 }
@@ -203,8 +234,8 @@ static CvSeq* detect_run_Haar_algorithm(IplImage* frame,
 	faces = cvHaarDetectObjects(frame,
 				    (CvHaarClassifierCascade*)algo,
 				    buf,
-				    1.1, /*default scale factor*/
-				    3,   /*default min neighbors*/
+				    1.2, /*default scale factor: 1.1*/
+				    2,   /*default min neighbors: 3*/
 				    CV_HAAR_DO_CANNY_PRUNING,
 				    cvSize(60, 60),  /*min size*/
 				    cvSize(180, 180) /*max size*/
@@ -231,13 +262,13 @@ static CvSeq* detect_run_latentSVM_algorithm(IplImage* frame,
 	return faces;
 }
 
-static int detect_store(CvSeq* faces, IplImage* img, int scale)
+static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 {
 	int i;
 	CvPoint ptA, ptB;
 	struct store_box *bbpos;
 	if (!faces)
-		return -EINVAL;
+		return NULL;
 	
 	bbpos = memalign(sizeof(struct store_box), faces->total);
 	printf("%d faces.\n", faces->total);
@@ -258,7 +289,7 @@ static int detect_store(CvSeq* faces, IplImage* img, int scale)
 		bbpos[i].ptB_y = ptA.y;
 	}
 	cvShowImage("FLL detection", (CvArr*)img);
-	return 0;
+	return bbpos;
 }
 
 #else
