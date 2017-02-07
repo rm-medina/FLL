@@ -5,4 +5,5 @@ aclocal --install -I m4 &&
     libtoolize -c --automake --force &&
     autoconf &&
     automake --add-missing --copy &&
-    ./configure --enable-doc --with-opencv=/usr/ "$@"
+    ./configure --with-opencv=/usr/ --enable-debug=full  "$@"
+#    ./configure --enable-doc --with-opencv=/usr/ "$@"
