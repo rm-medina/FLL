@@ -128,9 +128,9 @@ int main(int argc, char *const argv[])
 	int lindex, c, i, l, ret, panchannel, tiltchannel, servodevnode;
 	servodevnode = 0;
 	outfile = NULL;
-	xmlfile = NULL;
-	panchannel = 5;
-	tiltchannel = 2;
+	xmlfile = "haarcascade_frontalface_default.xml";
+	panchannel = 1;
+	tiltchannel = 5;
 	
 	/* get local configurations */
 	for (;;) {
@@ -177,7 +177,7 @@ int main(int argc, char *const argv[])
 	pipeline_init(&fllpipe);
 	/* first stage */
 	ret = asprintf(&camera_params.name, "FLL cam%d", video);
-	if (ret)
+	if (ret < 0)
 		goto terminate;
 	
 	camera_params.vididx = video;
@@ -223,14 +223,22 @@ int main(int argc, char *const argv[])
 		       i, pos[i], speed[i], accel[i]);
 
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
-	for (l=0; ret <= 0; l++)  {
+	for (l=0; ret >= 0; l++)  {
 		ret = pipeline_run(&fllpipe);
 		if (ret) {
 			printf("Cannot run FLL, ret:%d.\n", ret);
 			break;
 		}
-	}
+#if 0		
+		ret = pipeline_pause(&fllpipe);
+		if (ret){
+			printf("Cannot pause FLL, ret:%d.\n", ret);
+			break;
+		} 
+#endif
+	};
 terminate:
+	printf("camara %d: %s.\n", camera_params.vididx, camera_params.name);
 	pipeline_teardown(&fllpipe);
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &stop_time, &start_time);
