@@ -3,6 +3,7 @@
 
 #include "pipeline.h"
 #include "servolib.h"
+#include "store.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +21,7 @@ struct tracker_params {
 	int tilt_tgt;
 	struct servo_params pan_params;
 	struct servo_params tilt_params;
+	struct store_box bbox;
 };
 
 struct tracker {

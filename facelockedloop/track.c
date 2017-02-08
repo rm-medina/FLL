@@ -20,6 +20,7 @@ static void track_stage_down(struct stage *stg);
 static int track_stage_run(struct stage *stg);
 static void track_stage_wait(struct stage *stg);
 static void track_stage_go(struct stage *stg);
+static int track_stage_input(struct stage *stg, void** it);
 
 static struct stage_ops track_ops = {
 	.up = track_stage_up, 
@@ -27,6 +28,7 @@ static struct stage_ops track_ops = {
 	.run = track_stage_run,
 	.wait = track_stage_wait,
 	.go = track_stage_go,
+	.input = track_stage_input,
 };
 
 static void track_stage_up(struct stage *stg, struct stage_params *p,
@@ -52,7 +54,11 @@ static int track_stage_run(struct stage *stg)
 	struct tracker *tracer;
 
 	tracer = container_of(stg, struct tracker, step);
-	return track_run(tracer);
+	if (!tracer)
+		return -EINVAL;
+	else
+		return track_run(tracer);
+	
 }
 
 static void track_stage_wait(struct stage *stg)
@@ -65,6 +71,21 @@ static void track_stage_go(struct stage *stg)
 	stage_go(stg);
 }
 
+static int track_stage_input(struct stage *stg, void **it)
+{
+	void *itin = NULL;
+	struct tracker *tracer;
+
+	tracer = container_of(stg, struct tracker, step);
+	stage_input(stg, &itin);
+
+	tracer->params.bbox.ptA_x = ((struct store_box*)itin)->ptA_x;
+	tracer->params.bbox.ptA_y = ((struct store_box*)itin)->ptA_y;
+	tracer->params.bbox.ptB_x = ((struct store_box*)itin)->ptB_x;
+	tracer->params.bbox.ptB_y = ((struct store_box*)itin)->ptB_y;
+	
+	return 0;
+}
 
 int track_initialize(struct tracker *t, struct tracker_params *p,
 		     struct pipeline *pipe)
@@ -91,7 +112,7 @@ int track_initialize(struct tracker *t, struct tracker_params *p,
 	printf("%s tilt pos %d home %d.\n", __func__, p->tilt_params.position,
 		p->tilt_params.home_position);
 	
-	stage_up(&t->step, &stgparams, &track_ops, pipe);
+	track_stage_up(&t->step, &stgparams, &track_ops, pipe);
 	return ret;
 	
 }
@@ -172,7 +193,7 @@ int track_run(struct tracker *t)
 	
 	d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
 	e = t->params.pan_tgt - d;
-	printf("%s pan target: %d current %d err %d./n", __func__,
+	printf("%s pan target: %d current %d err %d.\n", __func__,
 	       t->params.pan_tgt, d, e);
 
 	if (e < t->stats.pan_stats.min_poserr)
@@ -198,7 +219,7 @@ tilt:
 
 	d = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
 	e = t->params.tilt_tgt - d;
-	printf("%s tilt target: %d current %d err %d./n", __func__,
+	printf("%s tilt target: %d current %d err %d.\n", __func__,
 	       t->params.tilt_tgt, d, e);
 
 	if (e < t->stats.tilt_stats.min_poserr)
