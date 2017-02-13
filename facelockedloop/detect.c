@@ -123,7 +123,9 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 	stgparams.data_out = NULL;
 
 	d->params = *p;
-	
+
+	cvNamedWindow("FLL detection", CV_WINDOW_AUTOSIZE);
+
 	d->params.scratchbuf = cvCreateMemStorage(0); /*block_size: 0->64K*/
 	if (d->params.scratchbuf == NULL)
 		return -ENOMEM;
@@ -158,8 +160,7 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 
 void detect_teardown(struct detector *d)
 {
-	cvDestroyWindow("FLL Display");
-	cvDestroyWindow("FLL Detection");
+	cvDestroyWindow("FLL detection");
 
 	if (d->params.dstframe)
 		cvReleaseImage(&(d->params.dstframe));
@@ -174,7 +175,6 @@ int detect_run(struct detector *d)
 	if (!d->params.scratchbuf)
 		return -ENOMEM;
 
-	cvNamedWindow("FLL detection", CV_WINDOW_AUTOSIZE);
 
 	d->params.dstframe = cvCreateImage(cvSize(d->params.srcframe->width,
 						  d->params.srcframe->height),
@@ -211,7 +211,7 @@ int detect_run(struct detector *d)
 		faces = 0;
 	};
 	if (!faces)
-		printf("No face, cdt=%d.\n", d->params.odt);
+		printf("No face struct, cdt=%d.\n", d->params.odt);
 	else
 		d->params.faceboxs = detect_store(faces, d->params.dstframe, 1);
 
@@ -267,7 +267,8 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 	int i;
 	CvPoint ptA, ptB;
 	struct store_box *bbpos;
-	if (!faces)
+
+	if (!faces || (faces->total ==0))
 		return NULL;
 	
 	bbpos = memalign(sizeof(struct store_box), faces->total);
