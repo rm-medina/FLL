@@ -97,7 +97,9 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 	if (!(i->params.videocam))
 		return -ENODEV;
 	p->videocam = i->params.videocam;
-	
+
+	printf("display window is %s.\n", i->params.name);
+
 	cvNamedWindow(p->name, CV_WINDOW_AUTOSIZE);
 
 	capture_stage_up(&i->step, &stgparams, &capture_ops, pipe);
@@ -125,14 +127,19 @@ int capture_run(struct imager *i)
 		if (!srcframe)
 			return -EIO;
 
+		++(i->params.frameidx);
 		i->params.frame = srcframe;
-		printf("cam%d captured %dth image(%p): %dx%d with [%d channels,"
+		printf("cam%d captured %dth image(%p = %p): %dx%d with [%d channels,"
 		       "%d step, %p data.\n",
  		       i->params.vididx , i->params.frameidx, srcframe,
+		       i->params.frame,
 		       srcframe->height, srcframe->width, srcframe->nChannels,
 		       srcframe->widthStep, srcframe->imageData);
-		cvShowImage(i->params.name, (CvArr*)srcframe);
+		printf("show on %s.\n", i->params.name);
+
+		cvShowImage(i->params.name, (CvArr*)(i->params.frame));
 		++(i->stats.tally);
+		cvWaitKey(10);
 	}
 	return 0;
 }
