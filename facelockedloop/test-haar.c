@@ -50,7 +50,7 @@ int main(int argc, char *const argv[])
 	if (!scratchbuf)
 		return -ENOMEM;
 
-	videocam = cvCreateCameraCapture(CV_CAP_ANY); 
+	videocam = cvCreateCameraCapture(CV_CAP_ANY+1); 
 	if (!videocam)
 		return -ENODEV;
 
