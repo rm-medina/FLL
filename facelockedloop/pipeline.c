@@ -158,13 +158,14 @@ int pipeline_run(struct pipeline *pipe)
 {
 	int n, ret;
 	struct stage *s;
-	
+	struct timespec delta, now, before;
 	ret = 0;
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
 		s = pipe->stgs[n];
 		printf("%s: run stage %d in:%p %p.\n", __func__,
 		       s->params.nth_stage, s->params.data_in,
 		       s->params.data_out);
+		clock_gettime(CLOCK_MONOTONIC, &before);
 		s->ops->go(s);
 		ret = sem_wait(&s->done);
 		if (ret) {
@@ -174,8 +175,26 @@ int pipeline_run(struct pipeline *pipe)
 		}
 		if (s->ops->output && s->next) 
 			s->ops->output(s, s->params.data_out);
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		timespec_substract(&delta, &now, &before);
+		printf("delta->  %lds %ldns .\n", delta.tv_sec , delta.tv_nsec );
+		if (!(s->params.data_out))
+		    break;
+		    
+		if (pipe->status) {
+			printf("exiting pipeline...\n");
+			ret = pipe->status;
+			break;
+
+		}
 	};
 	return ret;
+}
+
+void pipeline_terminate(struct pipeline *pipe, int reason)
+{
+	printf("aborting (reason:%d)/n", reason);
+	pipe->status = STAGE_ABRT;
 }
 
 int pipeline_pause(struct pipeline *pipe)

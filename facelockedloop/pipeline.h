@@ -15,6 +15,10 @@ extern "C" {
 
 struct pipeline;
 struct stage;
+
+
+#define STAGE_ABRT 0x1 /*abort received*/
+	
 struct stage_params {
 	int nth_stage;
 	void *data_in;
@@ -46,6 +50,7 @@ struct stage {
 	pthread_cond_t sync;
 	sem_t nowait;
 	sem_t done;
+	int flags;
 	struct performance {
 		struct timespec lastrun;
 		unsigned long ofinterest;
@@ -76,7 +81,7 @@ int pipeline_run(struct pipeline *pipe);
 int pipeline_pause(struct pipeline *pipe);
 int pipeline_printstats(struct pipeline *pipe);
 int pipeline_getcount(struct pipeline *pipe);
-
+void pipeline_terminate(struct pipeline *pipe, int reason);
 	
 #ifdef __cplusplus
 }
