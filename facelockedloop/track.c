@@ -14,6 +14,12 @@
 #include "servolib.h"
 #include "kernel_utils.h"
 
+#define ZONES_N 10
+#define ZONES_HALF 5
+  
+const int pan_zones[] = {0, 64, 128, 192, 256, 320, 384, 448, 512, 576};
+const int tilt_zones[] = {0, 48, 96, 144, 192, 240, 288, 336, 384, 432};  
+
 static void track_stage_up(struct stage *stg, struct stage_params *p,
 			     struct stage_ops *o,struct pipeline *pipe);
 static void track_stage_down(struct stage *stg);
@@ -111,7 +117,10 @@ int track_initialize(struct tracker *t, struct tracker_params *p,
 						       p->tilt_params.channel);
 	printf("%s tilt pos %d home %d.\n", __func__, p->tilt_params.position,
 		p->tilt_params.home_position);
-	
+
+	p->pan_params.home_position = p->pan_params.position;
+	p->tilt_params.home_position = p->tilt_params.home_position;
+
 	track_stage_up(&t->step, &stgparams, &track_ops, pipe);
 	return ret;
 	
@@ -175,6 +184,33 @@ int track_run(struct tracker *t)
 {
 	int  d, e;
 	int ret = 0;
+	int i, pan_zskip, tilt_zskip;
+	/* calculate new target */
+
+	for (i = 1; i < ZONES_N; i++)
+		if (t->params.bbox.ptA_x > pan_zones[i])
+			continue;
+		else
+			break;
+	pan_zskip = (i < (ZONES_HALF-1))? i : (i > ZONES_HALF)? i : 0;
+
+	if (pan_zskip)
+		t->params.pan_tgt = SERVOLIB_MIN_PULSE_QUARTER_US +
+			(SERVOLIB_DEF_STEP_QUARTER_US * pan_zskip);
+	
+		
+	for (i = 1; i < ZONES_N; i++)
+		if (t->params.bbox.ptA_y > tilt_zones[i])
+			continue;
+		else
+			break;
+
+	tilt_zskip = (i < (ZONES_HALF-1))? i : (i > ZONES_HALF)? i : 0;
+
+	if (tilt_zskip)
+		t->params.tilt_tgt = SERVOLIB_MIN_PULSE_QUARTER_US +
+			(SERVOLIB_DEF_STEP_QUARTER_US * tilt_zskip);
+			
 	
 	if (t->params.pan_params.position != t->params.pan_tgt)
 		ret = servoio_set_pulse(t->params.dev,
