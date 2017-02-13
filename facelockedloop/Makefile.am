@@ -54,7 +54,7 @@ fll_LDADD =		\
 if USEOPENCV
 if HAVE_OPENCV2
 fll_CPPFLAGS +=  @opencvinc@ -DHAVE_OPENCV2 
-fll_LDFLAGS = -L @opencvlib@
+fll_LDFLAGS +=  @opencvlib@
 fll_LDADD += @OPENCV_ADD_LDFLAG@
 endif
 endif
