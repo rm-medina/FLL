@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <errno.h>
 
 #include "pipeline.h"
 #include "capture.h"
@@ -24,7 +25,7 @@ extern const char *fll_version_name;
 #define FLL_MAX_SERVO_COUNT SERVOLIB_MAX_SERVO_COUNT
 #define FLL_SERVO_COUNT 2
 
-struct pipeline fllpipe;
+static struct pipeline fllpipe;
 
 
 static int with_output;
@@ -105,7 +106,38 @@ static void usage(void)
 
 
 /*helper function*/
+static void *signal_catch(void *arg)
+{
+	sigset_t *monitorset = arg;
+	int sig;
+	
+	for (;;) {
+		sigwait(monitorset, &sig);
+		
+		//printf("caught signal %d. Terminate!\n", sig);
+		pipeline_terminate(&fllpipe, -EINTR);
+	}
+	return NULL;
+}
 
+	
+static void setup_term_signals(void)
+{
+	static sigset_t set;
+	pthread_attr_t attr;
+	pthread_t id;
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGTERM);
+	sigaddset(&set, SIGHUP);
+	sigaddset(&set, SIGINT);
+	sigaddset(&set, SIGQUIT);
+	pthread_sigmask(SIG_BLOCK, &set, NULL);
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&id, &attr, signal_catch, &set);
+	pthread_attr_destroy(&attr);
+}
 
 int main(int argc, char *const argv[])
 {
@@ -126,6 +158,7 @@ int main(int argc, char *const argv[])
 	struct tracker servo;
 	enum object_detector_t dtype = CDT_HAAR;
 	int lindex, c, i, l, ret, panchannel, tiltchannel, servodevnode;
+	char ch;
 	servodevnode = 0;
 	outfile = NULL;
 	xmlfile = "haarcascade_frontalface_default.xml";
@@ -180,6 +213,8 @@ int main(int argc, char *const argv[])
 	if (ret < 0)
 		goto terminate;
 	
+	setup_term_signals();
+
 	camera_params.vididx = video;
 	camera_params.frame = NULL;
 	camera_params.videocam = NULL;
@@ -218,6 +253,7 @@ int main(int argc, char *const argv[])
 		goto terminate;
 	}
 
+	
 	for (i=0; i < FLL_MAX_SERVO_COUNT; i++)
 		printf("servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
 		       i, pos[i], speed[i], accel[i]);
@@ -243,5 +279,11 @@ terminate:
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &stop_time, &start_time);
 	printf("duration->  %lds %ldns .\n", duration.tv_sec , duration.tv_nsec );
+
+	printf("press a key to continue\n");
+	ch = getchar();
+	if (ch)
+		goto exitfll;
+exitfll:
 	return 0;
 }
