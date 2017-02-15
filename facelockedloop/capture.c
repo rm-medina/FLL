@@ -56,6 +56,8 @@ static int capture_stage_run(struct stage *stg)
 		return -EINVAL;
 	ret = capture_run(imgr);
 	stg->params.data_out = imgr->params.frame;
+	stg->stats.ofinterest = imgr->stats.tally;
+	
 	return ret;
 }
 
@@ -92,6 +94,7 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 	i->params.name = p->name;
 	i->params.vididx = p->vididx;
 	i->params.frame = p->frame;
+	i->params.frameidx = 0;
 	i->params.videocam = cvCreateCameraCapture(CV_CAP_ANY +
 						   i->params.vididx); 
 	if (!(i->params.videocam))
