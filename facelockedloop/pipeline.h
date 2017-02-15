@@ -53,6 +53,7 @@ struct stage {
 	int flags;
 	struct performance {
 		struct timespec lastrun;
+		struct timespec overall;
 		unsigned long ofinterest;
 		unsigned long persecond;
 	} stats;

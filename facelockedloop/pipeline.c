@@ -19,6 +19,7 @@ void stage_up(struct stage *stg, struct stage_params *p,
 	stg->pipeline = pipe;
 	timespec_zero(&stg->duration);
 	timespec_zero(&stg->stats.lastrun);
+	timespec_zero(&stg->stats.overall);
 	stg->stats.ofinterest = 0;
 	stg->stats.persecond = 0;
 	stg->next = NULL;
@@ -160,12 +161,20 @@ int pipeline_run(struct pipeline *pipe)
 	struct stage *s;
 	struct timespec delta, now, before;
 	ret = 0;
+	timespec_zero(&delta);
+	timespec_zero(&now);
+	timespec_zero(&before);
+	
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
 		s = pipe->stgs[n];
 		printf("%s: run stage %d in:%p %p.\n", __func__,
 		       s->params.nth_stage, s->params.data_in,
 		       s->params.data_out);
+
 		clock_gettime(CLOCK_MONOTONIC, &before);
+		s->stats.lastrun.tv_sec = before.tv_sec;
+		s->stats.lastrun.tv_nsec = before.tv_nsec;
+
 		s->ops->go(s);
 		ret = sem_wait(&s->done);
 		if (ret) {
@@ -175,12 +184,33 @@ int pipeline_run(struct pipeline *pipe)
 		}
 		if (s->ops->output && s->next) 
 			s->ops->output(s, s->params.data_out);
+
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		timespec_substract(&delta, &now, &before);
-		printf("delta->  %lds %ldns .\n", delta.tv_sec , delta.tv_nsec );
+		timespec_add(&s->stats.overall, &delta);
+		
+		printf("stage %d: delta->  %lds %ldns .\n", s->params.nth_stage,
+		       delta.tv_sec , delta.tv_nsec);
+		printf("stage %d: count: %ld. \n", s->params.nth_stage,
+		       s->stats.ofinterest);
+
+		printf("stage %d: overall: %lds %ldns. \n", s->params.nth_stage,
+		       s->stats.overall.tv_sec,
+		       s->stats.overall.tv_nsec);
+
 		if (!(s->params.data_out))
 		    break;
-		    
+
+		s->stats.persecond =
+			(s->stats.overall.tv_sec != 0) ?
+			((s->stats.ofinterest) /
+			 (s->stats.overall.tv_sec)) :
+			s->stats.ofinterest;
+
+		printf("stage %d: frequency (count/s) : %ld .\n",
+		       s->params.nth_stage,
+		       s->stats.persecond);
+		
 		if (pipe->status) {
 			printf("exiting pipeline...\n");
 			ret = pipe->status;
@@ -193,7 +223,7 @@ int pipeline_run(struct pipeline *pipe)
 
 void pipeline_terminate(struct pipeline *pipe, int reason)
 {
-	printf("aborting (reason:%d)/n", reason);
+	//printf("aborting (reason:%d)/n", reason);
 	pipe->status = STAGE_ABRT;
 }
 
@@ -223,7 +253,7 @@ void pipeline_teardown(struct pipeline *pipe)
 	int n;
 	
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
-		s = pipe->stgs[CAPTURE_STAGE];
+		s = pipe->stgs[n];
 		if (s->self) {
 			printf("%s: run stage %d.\n", __func__,
 			       s->params.nth_stage);
