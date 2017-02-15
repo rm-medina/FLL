@@ -273,32 +273,32 @@ int servoio_configure(int id, int channel, int pulse, int speed, int accel)
 	if (fd < 0)
 		return fd;
 
-	printdbg("Stopping channel %d on target %d.\n",
+	printdbg(": Stopping channel %d on target %d.\n",
 		 channel, id);
 	ret = __servoio_write_pulse(fd, channel, 0); /*stop*/
 	if (ret < 0)
 		printdbg("write pulse 0 error.");
 	
-	printdbg("Setting speed limit for channel %d on target %d" \
+	printdbg(": Setting speed limit for channel %d on target %d" \
 		 "to %d (0.25 μs)/(10 ms).\n",
 		 channel, id, speed);
 	ret = __servoio_write_speed(fd, channel, speed);
 	if (ret < 0)
-		printdbg("write speed limit error.");
+		printdbg(": write speed limit error.");
 
-	printdbg("Setting accel limit for channel %d on target %d" \
+	printdbg(": Setting accel limit for channel %d on target %d" \
 		 "to %d (0.25 μs)/(10 ms)/(80 ms).\n",
 		 channel, id, accel);
 	ret = __servoio_write_accel(fd, channel,  accel);
 	if (ret < 0)
-		printdbg("write accel limit error.");
+		printdbg(": write accel limit error.");
 
-	printdbg("Setting pulse for channel %d on target %d" \
+	printdbg(": Setting pulse for channel %d on target %d" \
 		 "to %d (0.25 μs) = %d μs.\n",
 		 channel, id, pulse, pulse>>2);
 	ret = __servoio_write_pulse(fd, channel, pulse);
 	if (ret < 0)
-		printdbg("write pulse value error.");
+		printdbg(": write pulse value error.");
 		 
 	close (fd);
 	return ret;
