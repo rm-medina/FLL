@@ -72,7 +72,7 @@ static inline int timespec_substract(struct timespec *const r,
 			       const struct timespec *const t1,
 			       const struct timespec *const t2)
 {
-	if (t1->tv_sec > t2->tv_sec) {
+	if (t1->tv_sec >= t2->tv_sec) {
 		r->tv_sec = t1->tv_sec - t2->tv_sec;
 		r->tv_nsec = t1->tv_nsec - t2->tv_nsec;
 
