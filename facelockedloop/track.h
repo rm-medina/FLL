@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 
+
 struct tracker_stats {
 	struct servo_stats pan_stats;
 	struct servo_stats tilt_stats;

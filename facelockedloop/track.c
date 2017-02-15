@@ -58,12 +58,20 @@ static void track_stage_down(struct stage *stg)
 static int track_stage_run(struct stage *stg)
 {
 	struct tracker *tracer;
-
+	int ret;
+	
 	tracer = container_of(stg, struct tracker, step);
 	if (!tracer)
 		return -EINVAL;
-	else
-		return track_run(tracer);
+	
+	ret =track_run(tracer);
+	stg->stats.ofinterest =
+		(tracer->stats.pan_stats.min_poserr +
+		 tracer->stats.pan_stats.max_poserr +
+		 tracer->stats.tilt_stats.min_poserr +
+		 tracer->stats.tilt_stats.max_poserr )
+		>> 1;
+	return ret;
 	
 }
 
@@ -113,11 +121,12 @@ int track_initialize(struct tracker *t, struct tracker_params *p,
 				     p->pan_params.channel);
 	printf("%s pan pos %d home %d.\n", __func__, p->pan_params.position,
 		p->pan_params.home_position);
+	t->stats.pan_stats.cmdstally[SERVOIO_READ] = 1;
 	p->tilt_params.position = servoio_get_position(p->dev,
 						       p->tilt_params.channel);
 	printf("%s tilt pos %d home %d.\n", __func__, p->tilt_params.position,
 		p->tilt_params.home_position);
-
+	t->stats.pan_stats.cmdstally[SERVOIO_WRITE] = 1;
 	p->pan_params.home_position = p->pan_params.position;
 	p->tilt_params.home_position = p->tilt_params.home_position;
 
@@ -196,7 +205,7 @@ int track_run(struct tracker *t)
 
 	if (pan_zskip)
 		t->params.pan_tgt = SERVOLIB_MIN_PULSE_QUARTER_US +
-			(SERVOLIB_DEF_STEP_QUARTER_US * pan_zskip);
+			(SERVOLIB_MIN_STEP_QUARTER_US * pan_zskip);
 	
 		
 	for (i = 1; i < ZONES_N; i++)
@@ -212,10 +221,12 @@ int track_run(struct tracker *t)
 			(SERVOLIB_DEF_STEP_QUARTER_US * tilt_zskip);
 			
 	
-	if (t->params.pan_params.position != t->params.pan_tgt)
+	if (t->params.pan_params.position != t->params.pan_tgt) {
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.pan_params.channel,
 					t->params.pan_tgt);
+		++(t->stats.pan_stats.cmdstally[SERVOIO_WRITE]);
+	}
 	else
 		goto tilt;
 	
@@ -228,6 +239,7 @@ int track_run(struct tracker *t)
 		t->stats.pan_stats.min_pos = t->params.pan_params.position;
 	
 	d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
+	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 	e = t->params.pan_tgt - d;
 	printf("%s pan target: %d current %d err %d.\n", __func__,
 	       t->params.pan_tgt, d, e);
@@ -241,10 +253,12 @@ int track_run(struct tracker *t)
 	t->params.pan_params.poserr = e;
 
 tilt:
-	if (t->params.tilt_params.position != t->params.tilt_tgt)
+	if (t->params.tilt_params.position != t->params.tilt_tgt) {
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.tilt_params.channel,
 					t->params.pan_tgt);
+		++(t->stats.tilt_stats.cmdstally[SERVOIO_WRITE]);
+	}
 	else
 		goto done;
 	
@@ -254,6 +268,7 @@ tilt:
 		t->params.tilt_params.position = t->params.tilt_tgt;
 
 	d = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
+	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 	e = t->params.tilt_tgt - d;
 	printf("%s tilt target: %d current %d err %d.\n", __func__,
 	       t->params.tilt_tgt, d, e);
