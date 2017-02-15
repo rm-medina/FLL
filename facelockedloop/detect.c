@@ -74,6 +74,8 @@ static int detect_stage_run(struct stage *stg)
 	ret = detect_run(algo);
 	/* pass only first face detected to next stage */
 	stg->params.data_out = &algo->params.faceboxs[0];
+	stg->stats.ofinterest = algo->stats.facecount;
+	
 	return ret;
 }
 
@@ -210,13 +212,17 @@ int detect_run(struct detector *d)
 	default:
 		faces = 0;
 	};
-	if (!faces)
+	if (!faces) {
 		printf("No face struct, cdt=%d.\n", d->params.odt);
-	else
+		d->stats.facecount = 0;
+	}
+	else {
 		d->params.faceboxs = detect_store(faces, d->params.dstframe, 1);
-
+		d->stats.facecount = faces->total;
+	}
+	
 	cvShowImage("FLL detection", (CvArr*)(d->params.dstframe));
-
+	cvWaitKey(5);
 	return 0;
 
 }
