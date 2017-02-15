@@ -79,6 +79,12 @@ static const struct option options[] = {
 		.has_arg = 1,
 		.flag = NULL,
 	},
+	{
+#define nloops_opt 8
+		.name = "loops",
+		.has_arg = 1,
+		.flag = NULL,
+	},
 };
 
 static void usage(void)
@@ -157,13 +163,14 @@ int main(int argc, char *const argv[])
 	struct detector algorithm;
 	struct tracker servo;
 	enum object_detector_t dtype = CDT_HAAR;
-	int lindex, c, i, l, ret, panchannel, tiltchannel, servodevnode;
+	int lindex, c, i, l, ret, panchannel, tiltchannel, servodevnode, loops;
 	char ch;
 	servodevnode = 0;
 	outfile = NULL;
 	xmlfile = "haarcascade_frontalface_default.xml";
 	panchannel = 1;
 	tiltchannel = 5;
+	loops = 0;
 	
 	/* get local configurations */
 	for (;;) {
@@ -196,6 +203,9 @@ int main(int argc, char *const argv[])
 			break;
 		case tracktilt_opt:
 			tiltchannel = atoi(optarg);
+			break;
+		case nloops_opt:
+			loops = atoi(optarg);
 			break;
 		default:
 			usage();
@@ -260,6 +270,7 @@ int main(int argc, char *const argv[])
 
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for (l=0; ret >= 0; l++)  {
+		printf("loop:%d.\n", l);
 		ret = pipeline_run(&fllpipe);
 		if (ret) {
 			printf("Cannot run FLL, ret:%d.\n", ret);
@@ -272,6 +283,8 @@ int main(int argc, char *const argv[])
 			break;
 		} 
 #endif
+		if (loops && (l >= loops))
+			break;
 	};
 terminate:
 	printf("camara %d: %s.\n", camera_params.vididx, camera_params.name);
