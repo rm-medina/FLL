@@ -196,10 +196,13 @@ int detect_run(struct detector *d)
 						    d->params.algorithm),
 					    d->params.scratchbuf,
 					    1.2, /*default scale factor: 1.1*/
-					    2,   /*default min neighbors: 3*/
-					    CV_HAAR_DO_CANNY_PRUNING,
-					    cvSize(60, 60),  /*min size*/
-					    cvSize(180, 180) /*max size*/	); 
+					    2,   /*default min neighbours: 3*/
+					    CV_HAAR_DO_CANNY_PRUNING |
+					    CV_HAAR_FIND_BIGGEST_OBJECT,
+					    cvSize(d->params.min_size,
+						   d->params.min_size),  
+					    cvSize(d->params.max_size,
+						   d->params.max_size) ); 
 		break;
 	case CDT_LSVM:
 		faces =	cvLatentSvmDetectObjects(d->params.dstframe,

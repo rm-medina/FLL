@@ -85,28 +85,47 @@ static const struct option options[] = {
 		.has_arg = 1,
 		.flag = NULL,
 	},
+	{
+#define dmins_opt 9
+		.name = "min_s",
+		.has_arg = 1,
+		.flag = NULL,
+	},
+	{
+#define dmaxs_opt 10
+		.name = "max_s",
+		.has_arg = 1,
+		.flag = NULL,
+	},
 };
 
 static void usage(void)
 {
-	fprintf(stderr, "usage: fll  <options>, with:\n");
-	fprintf(stderr, "--xmlfile=<filepath/filename> 		"
-		"specifies detector config file (default: ~/cascade.xml)\n");
-	fprintf(stderr, "--output[=<file-tmpl>] 		"
-		"dump output data (default: discard)\n");
-	fprintf(stderr, "--video[=<camera-index>] 		"
-		"specifies which camera to use (default: any camera)\n");
-	fprintf(stderr, "--algorithm[=<haar>|<lsvm>]            "
-		"select which detection algorithm to use (default: haar(\n");
-	fprintf(stderr, "--servodevnode=<dev-node-index> 		"
-		"specifies the servos device control node (default: 0)\n");
-	fprintf(stderr, "--panchannel[=<channel-index>] 		"
-		"specifies which channel the pan servo is connected to"
+	fprintf(stderr, "usage: fll  <options>, with:                   \n");
+	fprintf(stderr, "            --xmlfile=<filepath/filename>   "
+		":specifies detector config file (default: ~/cascade.xml)\n");
+	fprintf(stderr, "            --output[=<file-tmpl>]          "
+		":dump output data (default: discard)                    \n");
+	fprintf(stderr, "            --video[=<camera-index>] 	     "
+		":specifies which camera to use (default: any camera)    \n");
+	fprintf(stderr, "            --algorithm[=<haar>|<lsvm>]     "
+		":select which detection algorithm to use (default: haar)\n");
+	fprintf(stderr, "            --servodevnode=<dev-node-index> "
+		":specifies the servos device control node (default: 0)  \n");
+	fprintf(stderr, "            --panchannel[=<channel-index>]  "
+		":specifies which channel the pan servo is connected to "
 		"(default: 2)\n");
-	fprintf(stderr, "--tiltchannel[=<channel-index>] 		"
-		"specifies which channel the tilt servo is connected to"
+	fprintf(stderr, "            --tiltchannel[=<channel-index>] "
+		":specifies which channel the tilt servo is connected to "
 		"(default: 5)\n");
-	fprintf(stderr, "--help                 		"
+	fprintf(stderr, "            --nloops=<n>                    "
+		":specifies number of pipeline iterations to run, if 0 run "
+		"forever (default: 0)\n");
+	fprintf(stderr, "            --min_s=<n>]                    "
+		":specifies min size for the detector (default: 80)     \n");
+	fprintf(stderr, "            --max_s=<n>]                    "
+		":specifies max size for the detector (default: 180)    \n");
+	fprintf(stderr, "            --help                          "
 		"this help\n");
 }
 
@@ -164,6 +183,7 @@ int main(int argc, char *const argv[])
 	struct tracker servo;
 	enum object_detector_t dtype = CDT_HAAR;
 	int lindex, c, i, l, ret, panchannel, tiltchannel, servodevnode, loops;
+	int dmins, dmaxs;
 	char ch;
 	servodevnode = 0;
 	outfile = NULL;
@@ -171,6 +191,8 @@ int main(int argc, char *const argv[])
 	panchannel = 1;
 	tiltchannel = 5;
 	loops = 0;
+	dmins = 100;
+	dmaxs = 180;
 	
 	/* get local configurations */
 	for (;;) {
@@ -207,6 +229,12 @@ int main(int argc, char *const argv[])
 		case nloops_opt:
 			loops = atoi(optarg);
 			break;
+		case dmins_opt:
+			dmins = atoi(optarg);
+			break;
+		case dmaxs_opt:
+			dmaxs = atoi(optarg);
+			break;
 		default:
 			usage();
 			exit(1);
@@ -240,6 +268,8 @@ int main(int argc, char *const argv[])
 	algorithm_params.dstframe = NULL;
 	algorithm_params.algorithm = NULL;
 	algorithm_params.scratchbuf = NULL;
+	algorithm_params.min_size = dmins;
+	algorithm_params.max_size = dmaxs;
 	ret = detect_initialize(&algorithm, &algorithm_params, &fllpipe);
 	if (ret) {
 		printf("detection init ret:%d.\n", ret);
@@ -251,6 +281,7 @@ int main(int argc, char *const argv[])
 	servo_params.dev = servodevnode;
 	servo_params.pan_params.channel = panchannel;
 	servo_params.tilt_params.channel = tiltchannel;
+
 	ret = track_initialize(&servo , &servo_params, &fllpipe);
 	if (ret) {
 		printf("tracking init ret:%d.\n", ret);

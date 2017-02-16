@@ -27,6 +27,8 @@ struct detector_params {
 	void *algorithm;
 	CvMemStorage* scratchbuf;
 	struct store_box *faceboxs;
+	int min_size;
+	int max_size;
 };
 
 #else
@@ -38,6 +40,8 @@ struct detector_params {
 	void *algorithm;
 	void *scratchbuf;
 	struct store_box *faceboxs;
+	int min_size;
+	int max_size;
 };
 
 #endif
