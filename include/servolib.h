@@ -7,7 +7,8 @@
 #define SERVOLIB_MIN_PULSE_QUARTER_US 4000
 #define SERVOLIB_MAX_PULSE_QUARTER_US 8000
 #define SERVOLIB_MIN_STEP_QUARTER_US 100
-#define SERVOLIB_DEF_STEP_QUARTER_US 400
+#define SERVOLIB_DEF_STEP_QUARTER_US 200
+#define HOME_POSITION_QUARTER_US 6000
 
 enum servo_cmd{
 	SERVOIO_RESET,
@@ -24,6 +25,7 @@ struct servo_stats {
 	int max_pos;
 	int min_poserr;
 	int max_poserr;
+	int rt_err;
 	enum servo_cmd lastcmd;
 	int cmdstally[SERVOLIB_NUM_SERVO_CMDS];
 };
