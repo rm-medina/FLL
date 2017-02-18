@@ -17,6 +17,10 @@
 #define ZONES_N 10
 #define PtA_MIDDLE_ZONE 4
 #define PtB_MIDDLE_ZONE 5
+#define Pt_x_MIDDLE 320
+#define Pt_y_MIDDLE 240
+#define PAN_STEP_PIXELS 64
+#define TILT_STEP_PIXELS 48
 const int pan_zones[] = {0, 64, 128, 192, 256, 320, 384, 448, 512, 576};
 const int tilt_zones[] = {0, 48, 96, 144, 192, 240, 288, 336, 384, 432};  
 
@@ -178,65 +182,123 @@ void track_teardown(struct tracker *t)
 	
 }
 
+/*
+ * 4000 0.25us => izqda, arriba
+ * 6000 0.25us => centro, centro
+ * 8000 0.25us => derecha, abajo
+ */
 int track_run(struct tracker *t)
 {
-	int  d, e;
+	int  d, e, i, pan_pskip, tilt_pskip;
 	int ret = 0;
-	int i, pan_zskip, tilt_zskip;
-	/* calculate new target */
 
-	for (i = 1; i < ZONES_N; i++)
-		if (t->params.bbox.ptA_x > pan_zones[i])
-			continue;
-		else
-			break;
-	pan_zskip = (i != PtA_MIDDLE_ZONE)?
-		(PtA_MIDDLE_ZONE - i) : 0;
+	int pan_zskip = 0;
+	int tilt_zskip = 0;
+	int box_ptC_x, box_ptC_y;
 
-	/* if pan_zskip=0, check PtB */
-	if (!pan_zskip)
-		for (i =PtA_MIDDLE_ZONE; i < ZONES_N; i++)
-			if (t->params.bbox.ptB_x > pan_zones[i])
-				continue;
-			else
-				break;
-	pan_zskip = (i != PtB_MIDDLE_ZONE)?
-		(PtB_MIDDLE_ZONE -i) : 0;
+	box_ptC_x = (t->params.bbox.ptB_x - t->params.bbox.ptA_x) >> 1;
+	box_ptC_x += t->params.bbox.ptA_x;
+	printf("box_ptC_x=%d.\n", box_ptC_x);
 	
-	/* positive pan_zskip => left
-	 * negative pan_zskip => right
-	 */
-	if (pan_zskip)
-		t->params.pan_tgt = HOME_POSITION_QUARTER_US +
-			SERVOLIB_DEF_STEP_QUARTER_US * pan_zskip;
-		
+	pan_pskip = box_ptC_x - Pt_x_MIDDLE;
+	if (!pan_pskip) {
+		d = servoio_get_position(t->params.dev,
+					 t->params.pan_params.channel);
+	        if ((d < 4000) || (d > 8000))
+			printf("get pan position error %d.\n", d);
+		else
+			t->params.pan_tgt = t->params.pan_params.position = d;
+		goto pan_over;
+	}	
 	for (i = 1; i < ZONES_N; i++)
-		if (t->params.bbox.ptA_y > tilt_zones[i])
+		if (box_ptC_x > pan_zones[i])
 			continue;
 		else
 			break;
-	tilt_zskip = (i != PtA_MIDDLE_ZONE)? 
-		(PtA_MIDDLE_ZONE - i) : 0;
+	--i;
+	pan_zskip = ((i != PtA_MIDDLE_ZONE) && (i!= PtB_MIDDLE_ZONE))?
+	  (PtB_MIDDLE_ZONE - i) : 0;
 
-	/* if pan_zskip=0, check PtB */
-	if (!tilt_zskip)
-		for (i =PtA_MIDDLE_ZONE; i < ZONES_N; i++)
-			if (t->params.bbox.ptB_x > tilt_zones[i])
-				continue;
-			else
-				break;
-	tilt_zskip = (i != PtB_MIDDLE_ZONE)?
-		(PtB_MIDDLE_ZONE -i) : 0;
+	printf("pan ptC: pan_pskip:%d i=%d, pan_zskip:%d.\n", pan_pskip,
+	       i, pan_zskip);
 
-	/* positive tilt_zskip => up
-	 * negative tilt_zskip => down
+	/* positive pan_pskip => Pt < Center 
+	 *                    => face on left half, move it right 
+	 *		      => shift camera left
+	 * negative pan_pskip => Pt > Center
+	 *                    => face on right half, move it left
+	 *                    => shift camera right
+	 *
+	 * 4000 0.25us / 640 pixels => 25/4 = 6.25 0.25us/pixel
 	 */
-	if (tilt_zskip)
-		t->params.tilt_tgt = HOME_POSITION_QUARTER_US +
-			SERVOLIB_DEF_STEP_QUARTER_US * tilt_zskip;
+	/* d = SERVOLIB_DEF_STEP_QUARTER_US; */
+	if (pan_pskip)
+	  /*		t->params.pan_tgt = HOME_POSITION_QUARTER_US +
+			d * pan_zskip +
+			((d * pan_pskip) /
+			 PAN_STEP_PIXELS);
+	  */
+	  t->params.pan_tgt = HOME_POSITION_QUARTER_US -
+		  ((25 * pan_pskip)>>4);
+	
+	printf("pan_tgt:  %d .\n",
+	       t->params.pan_tgt);
 
-	printf("tilt_tgt: %d, tilt_zskip: %d pan_tgt: %d, pan_zskip: %d .\n",
-	       t->params.tilt_tgt, tilt_zskip, t->params.pan_tgt, pan_zskip);
+pan_over:	
+	/* repeat same algorithm for tilt, make a function! */
+	box_ptC_y = (t->params.bbox.ptB_y - t->params.bbox.ptA_y) >> 1;
+	box_ptC_y += t->params.bbox.ptA_y;
+	printf("box_ptC_y=%d.\n", box_ptC_y);
+	
+	tilt_pskip = box_ptC_y - Pt_y_MIDDLE;
+	if (!tilt_pskip) {
+		d = servoio_get_position(t->params.dev,
+					 t->params.tilt_params.channel);
+	        if (d < 0)
+			printf("get tilt position error %d.\n", d);
+		else
+			t->params.tilt_tgt = t->params.tilt_params.position = d;
+
+		goto tilt_over;
+	}
+	for (i = 1; i < ZONES_N; i++)
+		if (box_ptC_y > tilt_zones[i])
+			continue;
+		else
+			break;
+	--i;
+	tilt_zskip = ((i != PtA_MIDDLE_ZONE) && (i != PtB_MIDDLE_ZONE))? 
+		(i - PtB_MIDDLE_ZONE) : 0;
+
+	printf("tilt ptc: tilt_pskip:%d i=%d, tilt_zskip:%d.\n", tilt_pskip,
+	       i, tilt_zskip);
+
+	/* positive tilt_pskip => Pt < Center 
+	 *                     => face on top half, move it down 
+	 *		       => shift camera up
+	 * negative tilt_pskip => Pt > Center
+	 *                     => face on bottom half, move it up
+	 *                     => shift camera down
+	 *
+	 * 4000 0.25us / 480 pixels => 25/3 = 8.33 0.25us/pixel
+	 */
+	d = SERVOLIB_MIN_STEP_QUARTER_US >> 2;
+	if (tilt_zskip)
+/*		t->params.tilt_tgt = HOME_POSITION_QUARTER_US +
+			d * tilt_zskip +
+			((d * tilt_pskip) /
+			 TILT_STEP_PIXELS);
+*/
+		/* maybe even diminish tilt rate to avoid loosing  track,
+		   do >>4 instead of >>2?
+		 */
+		t->params.tilt_tgt = HOME_POSITION_QUARTER_US -
+			(((50 * pan_pskip)/3)>>2);
+
+	printf("tilt_tgt:  %d .\n",
+	       t->params.tilt_tgt);
+
+tilt_over:
 	
 	if (t->params.pan_params.position != t->params.pan_tgt) {
 		ret = servoio_set_pulse(t->params.dev,
@@ -246,15 +308,16 @@ int track_run(struct tracker *t)
 
 		if (ret < 0)
 			printf("%s error %d.\n", __func__, ret);
-		else
+/*		else
 			t->params.pan_params.position = t->params.pan_tgt;
 
-		if (t->params.pan_params.position < t->stats.pan_stats.min_pos)
-			t->stats.pan_stats.min_pos = t->params.pan_params.position;
-	
-		d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
+*/
+		d = servoio_get_position(t->params.dev,
+					 t->params.pan_params.channel);
+
 		++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 		e = t->params.pan_tgt - d;
+
 		printf("%s pan target: %d current %d err %d.\n", __func__,
 		       t->params.pan_tgt, d, e);
 
@@ -265,19 +328,26 @@ int track_run(struct tracker *t)
 			t->stats.pan_stats.max_poserr = e;
 		t->stats.pan_stats.rt_err = e;
 		t->params.pan_params.poserr = e;
+
+		t->params.pan_params.position = d;
+		
+		if (d < t->stats.pan_stats.min_pos)
+			t->stats.pan_stats.min_pos = d;
+	
 	}
 
 	if (t->params.tilt_params.position != t->params.tilt_tgt) {
+	  //for (i=t->params.tilt_params.position; i != t->params.tilt_tgt; 
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.tilt_params.channel,
-					t->params.pan_tgt);
+					t->params.tilt_tgt);
 		++(t->stats.tilt_stats.cmdstally[SERVOIO_WRITE]);
 	
 		if (ret < 0)
 			printf("%s error %d.\n", __func__, ret);
-		else
+/*		else
 			t->params.tilt_params.position = t->params.tilt_tgt;
-
+*/
 		d = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
 		++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 		e = t->params.tilt_tgt - d;
@@ -290,8 +360,11 @@ int track_run(struct tracker *t)
 		if (e > t->stats.tilt_stats.max_poserr)
 			t->stats.tilt_stats.max_poserr = e;
 
-		t->stats.pan_stats.rt_err = e;
+		t->stats.tilt_stats.rt_err = e;
 		t->params.tilt_params.poserr = e;
+		t->params.tilt_params.position = d;
+		if (d < t->stats.tilt_stats.min_pos)
+			t->stats.tilt_stats.min_pos = d;
 	}
 	
 	return ret;
