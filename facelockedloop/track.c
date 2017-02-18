@@ -231,15 +231,9 @@ int track_run(struct tracker *t)
 	 *
 	 * 4000 0.25us / 640 pixels => 25/4 = 6.25 0.25us/pixel
 	 */
-	/* d = SERVOLIB_DEF_STEP_QUARTER_US; */
 	if (pan_pskip)
-	  /*		t->params.pan_tgt = HOME_POSITION_QUARTER_US +
-			d * pan_zskip +
-			((d * pan_pskip) /
-			 PAN_STEP_PIXELS);
-	  */
-	  t->params.pan_tgt = HOME_POSITION_QUARTER_US -
-		  ((25 * pan_pskip)>>4);
+		t->params.pan_tgt = HOME_POSITION_QUARTER_US -
+			((25 * pan_pskip)>>4);
 	
 	printf("pan_tgt:  %d .\n",
 	       t->params.pan_tgt);
@@ -282,13 +276,8 @@ pan_over:
 	 *
 	 * 4000 0.25us / 480 pixels => 25/3 = 8.33 0.25us/pixel
 	 */
-	d = SERVOLIB_MIN_STEP_QUARTER_US >> 2;
+
 	if (tilt_zskip)
-/*		t->params.tilt_tgt = HOME_POSITION_QUARTER_US +
-			d * tilt_zskip +
-			((d * tilt_pskip) /
-			 TILT_STEP_PIXELS);
-*/
 		/* maybe even diminish tilt rate to avoid loosing  track,
 		   do >>4 instead of >>2?
 		 */
@@ -308,10 +297,7 @@ tilt_over:
 
 		if (ret < 0)
 			printf("%s error %d.\n", __func__, ret);
-/*		else
-			t->params.pan_params.position = t->params.pan_tgt;
 
-*/
 		d = servoio_get_position(t->params.dev,
 					 t->params.pan_params.channel);
 
@@ -337,7 +323,6 @@ tilt_over:
 	}
 
 	if (t->params.tilt_params.position != t->params.tilt_tgt) {
-	  //for (i=t->params.tilt_params.position; i != t->params.tilt_tgt; 
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.tilt_params.channel,
 					t->params.tilt_tgt);
@@ -345,9 +330,7 @@ tilt_over:
 	
 		if (ret < 0)
 			printf("%s error %d.\n", __func__, ret);
-/*		else
-			t->params.tilt_params.position = t->params.tilt_tgt;
-*/
+
 		d = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
 		++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 		e = t->params.tilt_tgt - d;
