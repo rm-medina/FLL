@@ -295,8 +295,8 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 			continue;
 		bbpos[i].ptA_x = ptA.x;
 		bbpos[i].ptA_y = ptA.y;
-		bbpos[i].ptB_x = ptA.x;
-		bbpos[i].ptB_y = ptA.y;
+		bbpos[i].ptB_x = ptB.x;
+		bbpos[i].ptB_y = ptB.y;
 	}
 	cvShowImage("FLL detection", (CvArr*)img);
 	return bbpos;
