@@ -235,50 +235,41 @@ static int track_map_inframe_shift_to_servo_pos(int is_panservo, int ifshift,
 	 * 480 * 5 = 2400 pixels covered by tilt servo =>
 	 *         => 2400 pixels/1000 positions = 2.4 pixels change per pos.
 	 */
-	int servo_tgt;
-	const int pan_change_rate = 64;
 	const int tilt_change_rate = 64;
+	const int pan_change_rate = 64;
+	int servo_tgt;
 	
-	if ((servo_cpos < 3700) ||
-	    (servo_cpos > SERVOLIB_MAX_PULSE_QUARTER_US)) {
-		printf("%s error servo_cpos %d .\n", __func__, servo_cpos);
-		sleep(1000);
-		return -EINVAL;
-	}
-	printf("%s pan_rate:%d, tilt_rate:%d.\n", __func__, pan_change_rate,
-	       tilt_change_rate);
+	printf("%s pan_rate:%d, tilt_rate:%d.\n", __func__, pan_change_rate, tilt_change_rate);
 	
-	servo_tgt = is_panservo ?
-		servo_cpos + ifshift/pan_change_rate :
-		servo_cpos - ifshift/tilt_change_rate;
-
 	if (is_panservo) {
-		if (ifshift < 0)
-			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
-		else
-			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
-	} else {
-		if (ifshift < 0)
-			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
-		else
-			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
-	}
+	  	servo_tgt = servo_cpos + ifshift/pan_change_rate;
 
-	if (is_panservo) {	
-	
+		if (ifshift < 0)
+			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+		else
+			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
+		
 		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US)
 			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 256;
 	
 		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US)
-			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;
+			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;		
 	}
-	else {
+	else  {
+		servo_tgt = servo_cpos - ifshift/tilt_change_rate;
+
+		if (ifshift < 0)
+			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
+		else
+			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+
 		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US + 512)
 			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 512;
 	
 		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US - 512)
 			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 512;
 	}
+	
 	return servo_tgt;
 }
 
@@ -287,12 +278,12 @@ static int get_bbox_center(int ptB, int ptA)
 	if (ptA > ptB)
 		return -EINVAL;
 	
-	return (((ptB - ptA) >> 1) + ptA);
+	return ((ptB - ptA) >> 1) + ptA;
 }
 
 static int get_frame_pixel_shift(int ptM, int ptC)
 {
-	return (ptM - ptC);
+	return ptM - ptC;
 }
 
 int track_run(struct tracker *t)
@@ -312,7 +303,6 @@ int track_run(struct tracker *t)
 	if (box_ptC_x < 0) {
 		printf("%s: %d error %d.\n",
 		       __func__, __LINE__, box_ptC_x);
-
 		sleep(1000);
 		return -EINVAL;
 	}
@@ -337,7 +327,7 @@ int track_run(struct tracker *t)
 	printf("current pan pos: %d.\n", t->params.pan_params.position);
 	printf("pan_tgt:  %d .\n", t->params.pan_tgt);
 
-retry:
+retry_pan:
 	d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
 	if (d < 0) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, d);
@@ -364,20 +354,15 @@ retry:
 	
 	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);	
 	e = t->params.pan_tgt - d;
-	if (e && t->params.pan_tgt != t->params.pan_params.position) {
+	if (e) {
 		printf("%s pan target: %d current %d err %d.\n", __func__,
 		       t->params.pan_tgt, d, e);
 
 			/* hack: remove this */
 			if (count--)
-				goto retry;
+				goto retry_pan;
 	}
 
-	if (abs(t->params.pan_tgt-t->params.pan_params.position) > 300) 
-		sleep(100);
-
-	usleep(5000);
-	
 	if (e < t->stats.pan_stats.min_poserr)
 		t->stats.pan_stats.min_poserr = e;
 
@@ -397,7 +382,7 @@ retry:
 	printf("box_ptC_y=%d.\n", box_ptC_y);
 
 	count = 10;
-tilt:
+retry_tilt:
 	
 	t->params.tilt_params.position = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
 	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
@@ -427,11 +412,8 @@ tilt:
 
 			/* hack: remove this */
 			if (count--)
-				goto tilt;
+				goto retry_tilt;
 	}
-
-	if (abs(t->params.tilt_tgt - t->params.tilt_params.position) > 300) 
-		sleep(100);
 
 	printf("%s tilt target: %d current %d err %d.\n", __func__,
 	       t->params.tilt_tgt, d, e);
