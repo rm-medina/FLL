@@ -263,11 +263,11 @@ static int track_map_inframe_shift_to_servo_pos(int is_panservo, int ifshift,
 		else
 			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
 
-		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US + 512)
-			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 512;
+		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US + 756)
+			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 756;
 	
-		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US - 512)
-			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 512;
+		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US - 756)
+			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 756;
 	}
 	
 	return servo_tgt;
