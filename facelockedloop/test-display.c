@@ -38,7 +38,7 @@ int main(int argc, char *const argv[])
 	if (!argc || !argv)
 		printf("No input args to test-display.\n");
 	
-	videocam = cvCreateCameraCapture(CV_CAP_ANY); 
+	videocam = cvCreateCameraCapture(CV_CAP_ANY+1); 
 	if (!videocam)
 		return -ENODEV;
 
