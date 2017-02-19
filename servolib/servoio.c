@@ -123,6 +123,8 @@ retry:
 		goto retry;
 //		return ret ? -errno : -EINVAL;
 
+	usleep (5000);
+	      
 	return 0;
 }
 

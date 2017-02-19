@@ -317,10 +317,7 @@ int track_run(struct tracker *t)
 		return -EINVAL;
 	}
 	
-	t->params.pan_params.position = servoio_get_position(
-		t->params.dev,
-		t->params.pan_params.channel);
-
+	t->params.pan_params.position = servoio_get_position(t->params.dev, t->params.pan_params.channel);
 	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 	d_ptCptM = get_frame_pixel_shift(frame_ptM_x, box_ptC_x);
 	
@@ -329,9 +326,7 @@ int track_run(struct tracker *t)
 	 *  new frame, or moving 
 	 * that distance  backwards / disappearing in new frame.
 	 */
-	t->params.pan_tgt = track_map_inframe_shift_to_servo_pos(
-		1, d_ptCptM, t->params.pan_params.position);
-
+	t->params.pan_tgt = track_map_inframe_shift_to_servo_pos(1, d_ptCptM, t->params.pan_params.position);
 	if (t->params.pan_tgt < 0) {
 		printf("%s: %d error .\n",  __func__, __LINE__);
 		sleep(1000);
@@ -343,8 +338,7 @@ int track_run(struct tracker *t)
 	printf("pan_tgt:  %d .\n", t->params.pan_tgt);
 
 retry:
-	d = servoio_get_position(t->params.dev,
-				 t->params.pan_params.channel);
+	d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
 	if (d < 0) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, d);
 		return -EIO;
@@ -353,20 +347,15 @@ retry:
 		printf("%s: %d pan = %d.\n", __func__, __LINE__, d);
 
 	if (t->params.pan_params.position != t->params.pan_tgt) {
-		ret = servoio_set_pulse(
-			t->params.dev,
-			t->params.pan_params.channel,
-			t->params.pan_tgt);
+		ret = servoio_set_pulse(t->params.dev, t->params.pan_params.channel, t->params.pan_tgt);
 		if (ret < 0) {
-			printf("%s: %d error %d.\n",
-			       __func__, __LINE__,ret);
+			printf("%s: %d error %d.\n",  __func__, __LINE__,ret);
 			return -EIO;
 		}
 		++(t->stats.pan_stats.cmdstally[SERVOIO_WRITE]);
 	}
 	
-	d = servoio_get_position(t->params.dev,
-				 t->params.pan_params.channel);
+	d = servoio_get_position(t->params.dev, t->params.pan_params.channel);
 	if (d < 0) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, d);
 		sleep(1000);
@@ -379,20 +368,15 @@ retry:
 		printf("%s pan target: %d current %d err %d.\n", __func__,
 		       t->params.pan_tgt, d, e);
 
-			usleep(1000);
 			/* hack: remove this */
 			if (count--)
 				goto retry;
-			else {
-				t->params.pan_tgt = t->params.pan_params.position;
-				goto retry;
-			}
-				
 	}
+
 	if (abs(t->params.pan_tgt-t->params.pan_params.position) > 300) 
 		sleep(100);
 
-	usleep(2000);
+	usleep(5000);
 	
 	if (e < t->stats.pan_stats.min_poserr)
 		t->stats.pan_stats.min_poserr = e;
@@ -411,19 +395,19 @@ retry:
 	box_ptC_y = (t->params.bbox.ptB_y - t->params.bbox.ptA_y) >> 1;
 	box_ptC_y += t->params.bbox.ptA_y;
 	printf("box_ptC_y=%d.\n", box_ptC_y);
-	t->params.tilt_params.position = servoio_get_position(
-		t->params.dev,
-		t->params.tilt_params.channel);
-	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
-	d_ptCptM = frame_ptM_y - box_ptC_y;
-	t->params.tilt_tgt = track_map_inframe_shift_to_servo_pos(
-		0, d_ptCptM, t->params.tilt_params.position); 
-	printf("tilt_tgt:  %d .\n", t->params.tilt_tgt);
 
 	count = 10;
+tilt:
 	
+	t->params.tilt_params.position = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
+	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
+
+	d_ptCptM = frame_ptM_y - box_ptC_y;
+
+	t->params.tilt_tgt = track_map_inframe_shift_to_servo_pos(0, d_ptCptM, t->params.tilt_params.position); 
+
+	printf("tilt_tgt:  %d .\n", t->params.tilt_tgt);
 	if (t->params.tilt_params.position != t->params.tilt_tgt) {
- tilt:
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.tilt_params.channel,
 					t->params.tilt_tgt);
@@ -438,24 +422,17 @@ retry:
 	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 	e = t->params.tilt_tgt - d;
 
-	if (e && t->params.tilt_tgt != t->params.tilt_params.position) {
-		printf("%s tilt target: %d current %d err %d.\n", __func__,
-		       t->params.tilt_tgt, d, e);
+	if (e) {
+		printf("%s tilt target: %d current %d err %d.\n", __func__, t->params.tilt_tgt, d, e);
 
-			usleep(1000);
 			/* hack: remove this */
 			if (count--)
 				goto tilt;
-			else {
-				t->params.tilt_tgt = t->params.tilt_params.position;
-				goto tilt;
-			}
-				
 	}
-	if (abs(t->params.tilt_tgt-t->params.tilt_params.position) > 300) 
+
+	if (abs(t->params.tilt_tgt - t->params.tilt_params.position) > 300) 
 		sleep(100);
 
-	usleep(2000);
 	printf("%s tilt target: %d current %d err %d.\n", __func__,
 	       t->params.tilt_tgt, d, e);
 	
