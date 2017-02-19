@@ -92,6 +92,7 @@ static int __servoio_read_pos(int fd, int target)
 	ret = read(fd, buf, sizeof(buf));
 	if (ret <= 0)
 		return ret ? -errno : -EINVAL;
+
 	return buf[0] + (buf[1] << 8);  /* maybe atoi(buf) instead? */
 }
 
@@ -110,14 +111,18 @@ static int __servoio_write_pulse(int fd, int target, int pulse)
 	char cmd[4];
 	int ret;
 
+retry:
+		
 	cmd[0] = 0x84;
 	cmd[1] = target;
 	cmd[2] = (char)(pulse & 0x7f);
 	cmd[3] = (char)((pulse >> 7) & 0x7f);
 	ret = write(fd, cmd, sizeof(cmd));
-	if (ret <= 0)
-		return ret ? -errno : -EINVAL;
-	
+
+	if (ret < (int) sizeof(cmd))
+		goto retry;
+//		return ret ? -errno : -EINVAL;
+
 	return 0;
 }
 
@@ -141,8 +146,8 @@ static int __servoio_write_speed(int fd, int target, int speed_limit)
 
 	cmd[0] = 0x84;
 	cmd[1] = target;
-	cmd[2] = (char)(speed_limit & 0x7f);
-	cmd[3] = (char)((speed_limit >> 7) & 0x7f);
+	cmd[2] = 0;//(char)(speed_limit & 0x7f);
+	cmd[3] = 0;//(char)((speed_limit >> 7) & 0x7f);
 	ret = write(fd, cmd, sizeof(cmd));
 	if (ret <= 0)
 		return ret ? -errno : -EINVAL;
@@ -175,8 +180,8 @@ static int __servoio_write_accel(int fd, int target, int acc_limit)
 
 	cmd[0] = 0x84;
 	cmd[1] = target;
-	cmd[2] = (char)(acc_limit & 0x7f);
-	cmd[3] = (char)((acc_limit >> 7) & 0x7f);
+	cmd[2] = 0;//(char)(acc_limit & 0x7f);
+	cmd[3] = 0;//(char)((acc_limit >> 7) & 0x7f);
 	ret = write(fd, cmd, sizeof(cmd));
 	if (ret <= 0)
 		return ret ? -errno : -EINVAL;
@@ -338,4 +343,65 @@ int servoio_all_go_home(int id)
 	close(fd);
 
 	return ret;
+}
+
+int servoio_map_pulse(int pos, int id, int channel)
+{
+	int servo_tgt;
+	int servo_coord;
+	
+	servo_tgt = servoio_get_position(id, channel);
+	servo_coord = servo_tgt - 4000;
+	printdbg(": current position: %d and coord: %d.\n", servo_tgt,
+		 servo_coord);
+	servoio_set_pulse(id, channel, pos);
+	servo_tgt = servoio_get_position(id, channel);
+	servo_coord = servo_tgt - 4000;
+	printdbg(": current position: %d and coord: %d.\n", servo_tgt,
+		 servo_coord);
+	
+	return (pos - 4000);
+
+}
+
+int servoio_map_coordinate(int coord, int min_coord, int max_coord)
+{
+	int servo_span = SERVOLIB_MAX_PULSE_QUARTER_US - SERVOLIB_MIN_PULSE_QUARTER_US;
+	int coord_span = max_coord - min_coord + 1;
+	int servo_tgt;
+	int compensation  = (coord % 4)? 0:1;
+	
+	servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US +
+		coord*(servo_span/coord_span) +
+		(compensation * (coord >> 2));
+	
+	if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US)
+		servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US;
+	if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US)
+		servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US;
+	
+	return servo_tgt;
+}
+
+int servoio_map_coordinate_with_restrictions(int coord, int min_coord,
+					     int max_coord,
+					     int min_pulse,
+					     int max_pulse)
+{
+	int coord_span = max_coord - min_coord + 1;
+	int compensation  = (coord % 4)? 0:1;
+	int servo_tgt, servo_span;
+	
+	servo_span = max_pulse - min_pulse;
+	
+	servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US +
+		coord*(servo_span/coord_span) +
+		(compensation * (coord >> 2));
+	if (servo_tgt < min_pulse)
+		servo_tgt = min_pulse;
+	if (servo_tgt > max_pulse)
+		servo_tgt = max_pulse;
+	
+	return servo_tgt;
+
 }
