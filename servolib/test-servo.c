@@ -85,6 +85,26 @@ static const struct option options[] = {
 		.flag = &cmd_enum,
 		.val = SERVOIO_WRITE,
 	},
+#define newc_opt 11
+	{
+		.name = "coord",
+		.has_arg = 1,
+		.flag = NULL,
+
+	},
+#define minc_opt 12
+	{
+		.name = "min_coord",
+		.has_arg = 1,
+		.flag = NULL,
+		
+	},
+#define maxc_opt 13
+	{
+		.name = "max_coord",
+		.has_arg = 1,
+		.flag = NULL,
+	},
 };
 
 static void usage(void)
@@ -100,15 +120,21 @@ static void usage(void)
 	fprintf(stderr, "--init - configure dev, channel with position, speed" \
 		"and accel values.\n");
 	fprintf(stderr, "--write <p|s|a> (p: position, s:speed, a:accel).\n");
+	fprintf(stderr, "--coord <c> - c:coordinate to map to PWM pulse duration.\n");
+	fprintf(stderr, "--min_coord <c> - c:min coordinate to map to PWM pulse duraLtion.\n");
+	fprintf(stderr, "--nax_coord <c> - c:max coordinate to map to PWM pulse duration.\n");
 	fprintf(stderr, "--help this help.\n");
 }
 
 int main(int argc, char *argv[])
 {
-	int opt,readerr;
+	int opt,readerr, newc;
 	int dev, pos, acclim, speelim;
 	int opt_index, do_reset, check_err, get_pos, do_conf, do_set,ret;
 	int chan = 5;
+	int minc = 0;
+	int maxc = 0;
+	
 	do_reset = check_err = get_pos = do_conf = do_set = 0;
 	dev = pos = acclim = speelim=-1;
 	for (;;) {
@@ -151,17 +177,36 @@ int main(int argc, char *argv[])
 		case configure_opt:
 			do_conf = 1;
 			break;
+		case newc_opt:
+			newc = atoi(optarg);
+			break;
+		case minc_opt:
+			minc = atoi(optarg);
+			break;
+		case maxc_opt:
+			maxc = atoi(optarg);
+			break;
 		case write_opt:
 			do_set = 1;
 			break;
+
 		default:
 			usage();
 			exit(1);
 		}
 	}
 
+	if (maxc) {
+		ret = servoio_map_coordinate(newc, minc, maxc);
+		fprintf(stderr, "test-servo map coordinates "	\
+		"coord: %d in (%d, %d) pulse: %d 0.25us.\n",
+		newc, minc, maxc, ret);
+		ret = servoio_set_pulse(dev, chan, ret);
+		pos = ret;
+		get_pos = 1;
+	}
 	if ((do_set) && (get_pos != -1)) {
-		ret = servoio_set_pulse(dev, chan, pos);
+		ret = servoio_map_pulse(dev, chan, pos);
 		fprintf(stderr, "test-servo set_pulse " \
 			"ttyACM%d channel %d pulse:%d ret 0x%x.\n",
 			dev, chan, pos, ret);

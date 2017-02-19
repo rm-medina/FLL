@@ -51,6 +51,12 @@ int servoio_configure(int id, int channel, int pulse, int speed, int accel);
 int servoio_get_position(int id, int channel);
 int servoio_get_any_error(int id);
 int servoio_all_go_home(int id);
+int servoio_map_pulse(int pos, int id, int channel);
+int servoio_map_coordinate(int coord, int min_coord, int max_coord);
+int servoio_map_coordinate_with_restrictions(int coord, int min_coord,
+					     int max_coord,
+					     int min_pulse,
+					     int max_pulse);
 
 #ifdef __cplusplus
 }
