@@ -250,22 +250,35 @@ static int track_map_inframe_shift_to_servo_pos(int is_panservo, int ifshift,
 	
 	servo_tgt = is_panservo ?
 		servo_cpos + ifshift/pan_change_rate :
-		servo_cpos + ifshift/tilt_change_rate;
+		servo_cpos - ifshift/tilt_change_rate;
 
-	if (ifshift < 0)
-		servo_tgt -= (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
-	else
-		servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
-		
-	if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US)
-		servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 256;
+	if (is_panservo) {
+		if (ifshift < 0)
+			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+		else
+			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
+	} else {
+		if (ifshift < 0)
+			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
+		else
+			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+	}
+
+	if (is_panservo) {	
 	
-	if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US)
-		servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;
-
-	if (servo_tgt < 0)
-		sleep(1000);
-
+		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US)
+			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 256;
+	
+		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US)
+			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;
+	}
+	else {
+		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US + 512)
+			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 512;
+	
+		if (servo_tgt > SERVOLIB_MAX_PULSE_QUARTER_US - 512)
+			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 512;
+	}
 	return servo_tgt;
 }
 
@@ -379,6 +392,8 @@ retry:
 	if (abs(t->params.pan_tgt-t->params.pan_params.position) > 300) 
 		sleep(100);
 
+	usleep(2000);
+	
 	if (e < t->stats.pan_stats.min_poserr)
 		t->stats.pan_stats.min_poserr = e;
 
@@ -405,19 +420,42 @@ retry:
 		0, d_ptCptM, t->params.tilt_params.position); 
 	printf("tilt_tgt:  %d .\n", t->params.tilt_tgt);
 
-	#if 0
+	count = 10;
+	
 	if (t->params.tilt_params.position != t->params.tilt_tgt) {
+ tilt:
 		ret = servoio_set_pulse(t->params.dev,
 					t->params.tilt_params.channel,
 					t->params.tilt_tgt);
-		if (ret < 0)
+		if (ret < 0) {
 			printf("%s error %d.\n", __func__, ret);
+			sleep(1000);
+		}
 		++(t->stats.tilt_stats.cmdstally[SERVOIO_WRITE]);
 	}
-	#endif
+
 	d = servoio_get_position(t->params.dev, t->params.tilt_params.channel);
 	++(t->stats.pan_stats.cmdstally[SERVOIO_READ]);
 	e = t->params.tilt_tgt - d;
+
+	if (e && t->params.tilt_tgt != t->params.tilt_params.position) {
+		printf("%s tilt target: %d current %d err %d.\n", __func__,
+		       t->params.tilt_tgt, d, e);
+
+			usleep(1000);
+			/* hack: remove this */
+			if (count--)
+				goto tilt;
+			else {
+				t->params.tilt_tgt = t->params.tilt_params.position;
+				goto tilt;
+			}
+				
+	}
+	if (abs(t->params.tilt_tgt-t->params.tilt_params.position) > 300) 
+		sleep(100);
+
+	usleep(2000);
 	printf("%s tilt target: %d current %d err %d.\n", __func__,
 	       t->params.tilt_tgt, d, e);
 	
