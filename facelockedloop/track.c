@@ -167,7 +167,7 @@ void track_teardown(struct tracker *t)
  * 6000 0.25us => servo span middle/middle
  * 8000 0.25us => all the way right/down
  */
-static int map_pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
+static int map_pixels2servoio_pos(enum servo_id sid, int pixels, int cpos)
 {
 	int servo_tgt;
 	
@@ -176,10 +176,16 @@ static int map_pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
 	
 	if (sid == pan) {
 
-		servo_tgt = cpos + ifshift/pan_change_rate;
+		servo_tgt = cpos + pixels/pan_change_rate;
 
-		if (ifshift < 0)
-			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+		/* 
+		 * errata : to avoid pan servo stalling on extreme positions of 
+		 * range, reduced boundaries are required.
+		 * (correction literals heuristically obtained).
+		 * 
+		 */
+		if (pixels < 0)
+			servo_tgt -= (servo_tgt % 256);
 		else
 			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
 		
@@ -190,12 +196,18 @@ static int map_pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
 			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;		
 	}
 	else  {
-		servo_tgt = cpos - ifshift/tilt_change_rate;
+		servo_tgt = cpos - pixels/tilt_change_rate;
 
-		if (ifshift < 0)
+		/* 
+		 * errata : to avoid tilt servo stalling on  extreme postions of
+		 * range, reduced  boundaries are required.
+		 * (correction literals heuristically obtained).
+		 * 
+		 */
+		if (pixels < 0)
 			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
 		else
-			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
+			servo_tgt -= (servo_tgt % 256);
 
 		if (servo_tgt < SERVOLIB_MIN_PULSE_QUARTER_US + 756)
 			servo_tgt = SERVOLIB_MIN_PULSE_QUARTER_US + 756;
