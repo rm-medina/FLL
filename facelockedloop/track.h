@@ -36,7 +36,6 @@ int track_initialize(struct tracker *t, struct tracker_params *p,
 		     struct pipeline *pipe);
 void track_teardown(struct tracker *t);
 int track_run(struct tracker *t);
-int track_get_max_abse(struct tracker *t);
 int track_print_stats(struct tracker *t);
   
 #ifdef __cplusplus

@@ -23,6 +23,10 @@ static const int pan_change_rate = 64;
 
 enum servo_id { pan = 0, tilt = 1};
 
+
+static int track_get_max_abse(struct tracker *t);
+static int track_update_stats(struct tracker *t);
+
 static void track_stage_up(struct stage *stg, struct stage_params *p,
 			     struct stage_ops *o,struct pipeline *pipe)
 {
@@ -103,6 +107,8 @@ int track_initialize(struct tracker *t, struct tracker_params *p,
 	stgparams.nth_stage = TRACKING_STAGE;
 	stgparams.data_out = NULL;
 	stgparams.data_in = NULL;
+	p->pan_params.home_position = HOME_POSITION_QUARTER_US;
+	p->tilt_params.home_position = HOME_POSITION_QUARTER_US;
 
 	t->params = *p;
 
@@ -161,7 +167,7 @@ void track_teardown(struct tracker *t)
  * 6000 0.25us => servo span middle/middle
  * 8000 0.25us => all the way right/down
  */
-static int pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
+static int map_pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
 {
 	int servo_tgt;
 	
@@ -214,7 +220,7 @@ static int get_pixels_shift(int ptM, int ptC)
 	return ptM - ptC;
 }
 
-static int move_motor(int id, int channel, int target)
+static int move_servo(int id, int channel, int target)
 {
 	int pos = 0, ret;
 	int i;
@@ -238,7 +244,7 @@ static int move_motor(int id, int channel, int target)
 
 int track_run(struct tracker *t)
 {
-	int servo, pan_channel, tilt_channel;
+	int id, pan_channel, tilt_channel;
 	int box_ptC_x, box_ptC_y;
 	int cpos; /* current motor position */
 	int tpos; /* target motor position  */
@@ -246,56 +252,57 @@ int track_run(struct tracker *t)
 
 	tilt_channel = t->params.tilt_params.channel;
 	pan_channel = t->params.pan_params.channel;
-	servo = t->params.dev;
+	id = t->params.dev;
 
 	/* handle PAN */
 	box_ptC_x = get_bbox_center(t->params.bbox.ptB_x, t->params.bbox.ptA_x);
 	if (box_ptC_x < 0) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, box_ptC_x);
-		sleep(1000);
 		return -EINVAL;
 	}
-	cpos = servoio_get_position(servo, pan_channel);
+	cpos = servoio_get_position(id, pan_channel);
 	if (cpos < 0) {
-		sleep(1000);
 		return -EINVAL;
 	}
-
-	tpos = pixels2servoio_pos(pan, get_pixels_shift(MAX_FRAME_WIDTH >> 1, box_ptC_x), cpos);
-	ret = move_motor(servo, pan_channel, tpos);
+	t->params.pan_params.position = cpos;
+	
+	tpos = map_pixels2servoio_pos(pan, get_pixels_shift(MAX_FRAME_WIDTH >> 1, box_ptC_x), cpos);
+	ret = move_servo(id, pan_channel, tpos);
 	if (ret) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, ret);
 		sleep(1000);
 		return -EINVAL;
 	}
-
+	t->params.pan_tgt = ret;
+	t->params.pan_params.poserr = ret - cpos;
+	
 	/* handle TILT */
 	box_ptC_y = get_bbox_center(t->params.bbox.ptB_y, t->params.bbox.ptA_y);
 	if (box_ptC_y < 0) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, box_ptC_y);
-
-		sleep(1000);
 		return -EINVAL;
 	}
 	
-	cpos = servoio_get_position(servo, tilt_channel);
+	cpos = servoio_get_position(id, tilt_channel);
 	if (cpos < 0) {
-		sleep(1000);
 		return -EINVAL;
 	}
-
-	tpos = pixels2servoio_pos(tilt, get_pixels_shift(MAX_FRAME_HEIGHT >> 1, box_ptC_y), cpos);
-	ret = move_motor(servo, tilt_channel, tpos);
+	t->params.tilt_params.position = cpos;
+	
+	tpos = map_pixels2servoio_pos(tilt, get_pixels_shift(MAX_FRAME_HEIGHT >> 1, box_ptC_y), cpos);
+	ret = move_servo(id, tilt_channel, tpos);
 	if (ret) {
 		printf("%s: %d error %d.\n", __func__, __LINE__, ret);
 
 		sleep(1000);
 		return -EINVAL;
 	}
+	t->params.tilt_tgt = ret;
+	t->params.tilt_params.poserr = ret - cpos;
 
+	track_update_stats(t);
 	return 0;
 }
-
 
 int track_get_max_abse(struct tracker *t)
 {
@@ -307,9 +314,73 @@ int track_get_max_abse(struct tracker *t)
 	return ((abs(pabse) > abs(tabse))? pabse : tabse);
 }
 
+#if !defined(ENABLE_STATS)
+
+int track_update_stats(struct tracker *t)
+{
+	return 0;
+}
+
 int track_print_stats(struct tracker *t)
 {
 	return 0;
 }
 
+#else
 
+int track_update_stats(struct tracker *t)
+{
+	if (!t)
+		return -EINVAL;
+	
+	t->stats.pan_stats.rt_err = t->params.pan_params.poserr;
+	if (t->params.pan_params.poserr < t->stats.pan_stats.min_poserr)
+		t->stats.pan_stats.min_poserr = t->params.pan_params.poserr;
+
+	if (t->params.pan_params.poserr > t->stats.pan_stats.max_poserr)
+		t->stats.pan_stats.max_poserr = t->params.pan_params.poserr;
+
+	if (t->params.pan_params.position < t->stats.pan_stats.min_pos)
+		t->stats.pan_stats.min_pos = t->params.pan_params.position;
+
+	if (t->params.pan_params.position > t->stats.pan_stats.max_pos)
+		t->stats.pan_stats.max_pos = t->params.pan_params.position;
+
+	t->stats.tilt_stats.rt_err = t->params.tilt_params.poserr;
+	if (t->params.tilt_params.poserr < t->stats.tilt_stats.min_poserr)
+		t->stats.tilt_stats.min_poserr = t->params.tilt_params.poserr;
+
+	if (t->params.tilt_params.poserr > t->stats.tilt_stats.max_poserr)
+		t->stats.tilt_stats.max_poserr = t->params.tilt_params.poserr;
+
+	if (t->params.pan_params.position < t->stats.tilt_stats.min_pos)
+		t->stats.tilt_stats.min_pos = t->params.tilt_params.position;
+
+	if (t->params.tilt_params.position > t->stats.tilt_stats.max_pos)
+		t->stats.tilt_stats.max_pos = t->params.tilt_params.position;
+
+	return 0;
+}
+
+int track_print_stats(struct tracker *t)
+{
+	if (!t)
+		return -EINVAL;
+
+	printf("servo    min_pos      max_pos      min_err     max_err     \n");
+	printf("-----------------------------------------------------------\n");
+	printf("PAN      %d           %d           %d          %d          \n",
+	       t->stats.pan_stats.min_pos,
+	       t->stats.pan_stats.max_pos,
+	       t->stats.pan_stats.min_poserr,
+	       t->stats.pan_stats.max_poserr);
+	printf("TILT     %d           %d           %d          %d          \n",
+	       t->stats.tilt_stats.min_pos,
+	       t->stats.tilt_stats.max_pos,
+	       t->stats.tilt_stats.min_poserr,
+	       t->stats.tilt_stats.max_poserr);
+
+	return 0;
+}
+
+#endif
