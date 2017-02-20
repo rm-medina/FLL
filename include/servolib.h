@@ -32,8 +32,6 @@ struct servo_stats {
 
 struct servo_params {
 	int channel;
-	int position;
-	int home_position;
 	int min_position;
 	int max_position;
 	int poserr;

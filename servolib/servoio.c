@@ -246,8 +246,10 @@ int servoio_set_accel(int id, int channel, int value)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
+
 	ret = __servoio_write_accel(fd, channel, value);
 	close(fd);
+
 	return ret;
 }
 
@@ -257,8 +259,10 @@ int servoio_set_speed(int id, int channel, int value)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
+
 	ret = __servoio_write_speed(fd, channel, value);
 	close(fd);
+
 	return ret;
 }
 
@@ -270,6 +274,7 @@ int servoio_set_pulse(int id, int channel, int value)
 		return fd;
 	ret = __servoio_write_pulse(fd, channel, value);
 	close(fd);
+
 	return ret;
 }
 
@@ -317,6 +322,7 @@ int servoio_get_position(int id, int channel)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
+
 	ret = __servoio_read_pos(fd, channel);
 	close(fd);
 
@@ -329,6 +335,7 @@ int servoio_get_any_error(int id)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
+
 	ret = __servoio_read_error(fd);
 	close(fd);
 
@@ -341,6 +348,7 @@ int servoio_all_go_home(int id)
 	fd = __servoio_open(id, O_RDWR | O_NOCTTY);
 	if (fd < 0)
 		return fd;
+
 	ret = __servoio_reset_all(fd);
 	close(fd);
 
