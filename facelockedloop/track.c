@@ -21,7 +21,7 @@ static const int pan_change_rate = 64;
 #define MAX_FRAME_WIDTH	640
 #define MAX_FRAME_HEIGHT 480
 
-enum motor { pan = 0, tilt = 1};
+enum servo_id { pan = 0, tilt = 1};
 
 static void track_stage_up(struct stage *stg, struct stage_params *p,
 			     struct stage_ops *o,struct pipeline *pipe)
@@ -94,7 +94,8 @@ static struct stage_ops track_ops = {
 	.input = track_stage_input,
 };
 
-int track_initialize(struct tracker *t, struct tracker_params *p, struct pipeline *pipe)
+int track_initialize(struct tracker *t, struct tracker_params *p,
+		     struct pipeline *pipe)
 {
   	struct stage_params stgparams;
 	int ret;
@@ -110,13 +111,15 @@ int track_initialize(struct tracker *t, struct tracker_params *p, struct pipelin
 		printf("%s home error %d.\n", __func__, ret);
 		return -EIO;
 	}
-	ret = servoio_set_pulse(t->params.dev, t->params.pan_params.channel, HOME_POSITION_QUARTER_US);
+	ret = servoio_set_pulse(t->params.dev, t->params.pan_params.channel,
+				HOME_POSITION_QUARTER_US);
 	if (ret < 0) {
 		printf("%s set pulse error %d.\n", __func__, ret);
 		return -EIO;
 	}
 
-	ret = servoio_set_pulse(t->params.dev, t->params.tilt_params.channel, HOME_POSITION_QUARTER_US);
+	ret = servoio_set_pulse(t->params.dev, t->params.tilt_params.channel,
+				HOME_POSITION_QUARTER_US);
 	if (ret < 0) {
 		printf("%s set pulse error %d.\n", __func__, ret);
 		return -EIO;
@@ -138,13 +141,15 @@ void track_teardown(struct tracker *t)
 		return;
 	}
 
-	ret = servoio_configure(t->params.dev, t->params.pan_params.channel, HOME_POSITION_QUARTER_US, 0, 0);
+	ret = servoio_configure(t->params.dev, t->params.pan_params.channel,
+				HOME_POSITION_QUARTER_US, 0, 0);
 	if (ret < 0) {
 		printf("%s stopping pan servo failed %d.\n", __func__, ret);
 		return;
 	}
 
-	ret = servoio_configure(t->params.dev, t->params.tilt_params.channel, HOME_POSITION_QUARTER_US, 0, 0);
+	ret = servoio_configure(t->params.dev, t->params.tilt_params.channel,
+				HOME_POSITION_QUARTER_US, 0, 0);
 	if (ret < 0) {
 		printf("%s stopping tilt servo failed %d.\n", __func__, ret);
 		return;
@@ -156,13 +161,14 @@ void track_teardown(struct tracker *t)
  * 6000 0.25us => servo span middle/middle
  * 8000 0.25us => all the way right/down
  */
-static int pixels2servoio_pos(enum motor motor, int ifshift, int cpos)
+static int pixels2servoio_pos(enum servo_id sid, int ifshift, int cpos)
 {
 	int servo_tgt;
 	
-	printf("%s pan_rate:%d, tilt_rate:%d.\n", __func__, pan_change_rate, tilt_change_rate);
+	printf("%s pan_rate:%d, tilt_rate:%d.\n", __func__, pan_change_rate,
+	       tilt_change_rate);
 	
-	if (motor == pan) {
+	if (sid == pan) {
 
 		servo_tgt = cpos + ifshift/pan_change_rate;
 
