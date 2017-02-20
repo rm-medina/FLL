@@ -19,9 +19,9 @@ static const int tilt_change_rate = 64;
 static const int pan_change_rate = 64;
 
 #define MAX_FRAME_WIDTH	640
-#define MAX_FRAME_EIGHT 480
+#define MAX_FRAME_HEIGHT 480
 
-enum { pan = 0, tilt = 1} motor;
+enum motor { pan = 0, tilt = 1};
 
 static void track_stage_up(struct stage *stg, struct stage_params *p,
 			     struct stage_ops *o,struct pipeline *pipe)
@@ -35,7 +35,7 @@ static void track_stage_down(struct stage *stg)
 	struct tracker *tracer = container_of(stg, struct tracker, step);
 
 	if (!tracer)
-		return -EINVAL;
+		return;
 
 	track_teardown(tracer);
 	stage_down(stg);
@@ -84,6 +84,15 @@ static int track_stage_input(struct stage *stg, void **it)
 	
 	return 0;
 }
+
+static struct stage_ops track_ops = {
+	.up = track_stage_up,
+	.down = track_stage_down,
+	.run = track_stage_run,
+	.wait = track_stage_wait,
+	.go = track_stage_go,
+	.input = track_stage_input,
+};
 
 int track_initialize(struct tracker *t, struct tracker_params *p, struct pipeline *pipe)
 {
@@ -147,7 +156,7 @@ void track_teardown(struct tracker *t)
  * 6000 0.25us => servo span middle/middle
  * 8000 0.25us => all the way right/down
  */
-static int pixels2servoio_pos(enum motor, int ifshift, int cpos)
+static int pixels2servoio_pos(enum motor motor, int ifshift, int cpos)
 {
 	int servo_tgt;
 	
@@ -155,7 +164,7 @@ static int pixels2servoio_pos(enum motor, int ifshift, int cpos)
 	
 	if (motor == pan) {
 
-		servo_tgt = servo_cpos + ifshift/pan_change_rate;
+		servo_tgt = cpos + ifshift/pan_change_rate;
 
 		if (ifshift < 0)
 			servo_tgt -= (servo_tgt % 256) ? (servo_tgt % 256) : 0;
@@ -169,7 +178,7 @@ static int pixels2servoio_pos(enum motor, int ifshift, int cpos)
 			servo_tgt = SERVOLIB_MAX_PULSE_QUARTER_US - 256;		
 	}
 	else  {
-		servo_tgt = servo_cpos - ifshift/tilt_change_rate;
+		servo_tgt = cpos - ifshift/tilt_change_rate;
 
 		if (ifshift < 0)
 			servo_tgt += (servo_tgt % 256) ? 256 - (servo_tgt % 256) : 0;
@@ -201,8 +210,7 @@ static int get_pixels_shift(int ptM, int ptC)
 
 static int move_motor(int id, int channel, int target)
 {
-	const int count = 10;
-	int pos = 0, ret, error;
+	int pos = 0, ret;
 	int i;
 
 	for (i = 0; i < 10 && !!(target - pos); i++) {
@@ -213,7 +221,7 @@ static int move_motor(int id, int channel, int target)
 		}
 
 		pos = servoio_get_position(id, channel);
-		if (d < 0) {
+		if (pos < 0) {
 			return -EIO;
 		}
 	}
@@ -225,13 +233,13 @@ static int move_motor(int id, int channel, int target)
 int track_run(struct tracker *t)
 {
 	int servo, pan_channel, tilt_channel;
-	int pixels, box_ptC_x, box_ptC_y;
+	int box_ptC_x, box_ptC_y;
 	int cpos; /* current motor position */
 	int tpos; /* target motor position  */
 	int ret;
 
 	tilt_channel = t->params.tilt_params.channel;
-	pan_chanel = t->params.pan_params.channel;
+	pan_channel = t->params.pan_params.channel;
 	servo = t->params.dev;
 
 	/* handle PAN */
@@ -298,12 +306,4 @@ int track_print_stats(struct tracker *t)
 	return 0;
 }
 
-static struct stage_ops track_ops = {
-	.up = track_stage_up,
-	.down = track_stage_down,
-	.run = track_stage_run,
-	.wait = track_stage_wait,
-	.go = track_stage_go,
-	.input = track_stage_input,
-};
 
