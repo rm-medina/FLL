@@ -49,7 +49,7 @@ fll_LDFLAGS = @FLL_LDFLAGS@
 
 fll_LDADD =		\
 	../servolib/libservolib.la \
-	-lpthread -lrt
+	-lpthread -lrt -lm
 
 if USEOPENCV
 if HAVE_OPENCV2
