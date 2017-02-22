@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
-#include "highgui/highgui_c.h"
+//#include "opencv2/highgui.hpp"
+#include "opencv2/highgui/highgui_c.h"
 
 /*
  * Substract the 'struct timespec' values end and start, storing the result in

@@ -159,8 +159,8 @@ AC_ARG_WITH(opencv,
 	      n | no) opencv=n ;;
 	      *)
 	      opencv=y
-	      opencvinc="-I$withval/include/opencv2"
-	      opencvlib="-L$withval/lib"
+	      opencvinc="-I$withval/include/"
+	      opencvlib="-L$withval/lib/"
 	      ;;
 	      esac])
 AC_MSG_RESULT(${opencv:-no})
@@ -339,7 +339,7 @@ if test x$use_assert = x; then
    FLL_CFLAGS="-DNDEBUG $FLL_CFLAGS"
 fi
 
-FLL_CFLAGS="$FLL_CFLAGS -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wno-long-long -Wno-unused-parameter -Werror -fstrict-aliasing"
+FLL_CFLAGS="$FLL_CFLAGS -Wextra -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-variable -Wno-long-long -Wno-unused-parameter -Werror -fstrict-aliasing"
 FLL_EXTRA_CFLAGS="-Wno-unused-function"
 LIBS=
 

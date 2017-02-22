@@ -49,13 +49,13 @@ fll_LDFLAGS = @FLL_LDFLAGS@
 
 fll_LDADD =		\
 	../servolib/libservolib.la \
-	-lpthread -lrt
+	-lpthread -lrt -lm
 
-if USEOPENCV
-if HAVE_OPENCV2
+#if USEOPENCV
+#if @HAVE_OPENCV2@
 fll_CPPFLAGS +=  @opencvinc@ -DHAVE_OPENCV2 
-fll_LDFLAGS +=  @opencvlib@
-fll_LDADD += @OPENCV_ADD_LDFLAG@
-endif
-endif
+fll_LDFLAGS +=  @opencvlib@ -L/home/rmedina/FLL/target/arm/usr/local/opencv/lib/
+fll_LDADD += @OPENCV_ADD_LDFLAG@ -L/home/rmedina/FLL/target/arm/usr/local/opencv/lib/ -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_objdetect
+#endif
+#endif
 

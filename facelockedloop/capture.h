@@ -8,7 +8,7 @@ extern "C" {
 #include "pipeline.h"
 
 #if defined(HAVE_OPENCV2)
-#include "highgui/highgui_c.h"
+#include "opencv2/highgui/highgui_c.h"
 
 struct imager_params {
 	char* name;

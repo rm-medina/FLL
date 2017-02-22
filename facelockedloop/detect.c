@@ -13,9 +13,12 @@
 #include "kernel_utils.h"
 
 #if defined(HAVE_OPENCV2)
-#include "highgui/highgui_c.h"
-#include "imgproc/imgproc_c.h"
-#include "objdetect/objdetect.hpp"
+//#include "opencv2/highgui.hpp"
+#include "opencv2/highgui/highgui_c.h"
+//#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/imgproc/imgproc_c.h"
+//#include "opencv2/objdetect.hpp"
+#include "opencv2/objdetect/objdetect.hpp"
 
 static CvSeq* detect_run_Haar_algorithm(IplImage* frame,
 					CvMemStorage* const buffer,
@@ -304,7 +307,7 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 
 #else
 
-int detect_initialize(struct detector *d, struct detector_params *p)
+int detect_initialize(struct detector *d, struct detector_params *p, struct pipeline *pipe)
 {
 	return -ENODEV;
 }
