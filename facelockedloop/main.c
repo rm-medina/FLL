@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#include <string.h>
 
 #include "pipeline.h"
 #include "capture.h"
@@ -247,6 +248,7 @@ int main(int argc, char *const argv[])
 
 	pipeline_init(&fllpipe);
 	/* first stage */
+	camera_params.name = malloc(10);
 	ret = asprintf(&camera_params.name, "FLL cam%d", video);
 	if (ret < 0)
 		goto terminate;
