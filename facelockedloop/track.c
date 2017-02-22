@@ -86,7 +86,7 @@ static int track_stage_input(struct stage *stg, void **it)
 	tracer->params.bbox.ptB_x = ((struct store_box*)itin)->ptB_x;
 	tracer->params.bbox.ptB_y = ((struct store_box*)itin)->ptB_y;
 
-	free((struct store_box*)itin);
+        free((struct store_box*)itin);
 	return 0;
 }
 
