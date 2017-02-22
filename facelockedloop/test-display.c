@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
-//#include "opencv2/highgui.hpp"
 #include "opencv2/highgui/highgui_c.h"
 
 /*

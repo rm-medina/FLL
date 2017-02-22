@@ -311,7 +311,8 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 
 #else
 
-int detect_initialize(struct detector *d, struct detector_params *p, struct pipeline *pipe)
+int detect_initialize(struct detector *d, struct detector_params *p,
+		      struct pipeline *pipe)
 {
 	return -ENODEV;
 }

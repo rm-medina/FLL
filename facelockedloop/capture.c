@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #if defined(HAVE_OPENCV2)
-//#include "opencv2/highgui.hpp"
 #include "opencv2/highgui/highgui_c.h"
 #endif
 
