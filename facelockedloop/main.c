@@ -247,6 +247,7 @@ int main(int argc, char *const argv[])
 
 	pipeline_init(&fllpipe);
 	/* first stage */
+        camera_params.name = malloc(10);
 	ret = asprintf(&camera_params.name, "FLL cam%d", video);
 	if (ret < 0)
 		goto terminate;
@@ -323,7 +324,7 @@ terminate:
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &stop_time, &start_time);
 	printf("duration->  %lds %ldns .\n", duration.tv_sec , duration.tv_nsec );
-
+        free(camera_params.name);	
 	printf("press a key to continue\n");
 	ch = getchar();
 	if (ch)
