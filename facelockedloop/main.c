@@ -325,7 +325,7 @@ terminate:
 	clock_gettime(CLOCK_MONOTONIC, &stop_time);
 	timespec_substract(&duration, &stop_time, &start_time);
 	printf("duration->  %lds %ldns .\n", duration.tv_sec , duration.tv_nsec );
-
+        free(camera_params.name);	
 	printf("press a key to continue\n");
 	ch = getchar();
 	if (ch)
