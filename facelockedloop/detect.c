@@ -228,7 +228,9 @@ int detect_run(struct detector *d)
 	}
 	
 	cvShowImage("FLL detection", (CvArr*)(d->params.dstframe));
-	cvWaitKey(5);
+	cvWaitKey(10);
+	cvReleaseImage(&d->params.dstframe);
+	d->params.dstframe = NULL;
 	return 0;
 
 }
@@ -283,7 +285,9 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 	if (!faces || (faces->total ==0))
 		return NULL;
 	
-	bbpos = memalign(sizeof(struct store_box), faces->total);
+	bbpos = calloc(faces->total, sizeof(struct store_box));
+	if (!bbpos)
+		return NULL;
 	printf("%d faces.\n", faces->total);
 	for (i = 0; i < faces->total; i++)
 	{
