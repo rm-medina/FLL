@@ -112,6 +112,7 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 void capture_teardown(struct imager *i)
 {
 	cvDestroyWindow(i->params.name);
+	cvReleaseCapture(&i->params.videocam);
 }
 
 int capture_run(struct imager *i)
@@ -141,8 +142,8 @@ int capture_run(struct imager *i)
 		printf("show on %s.\n", i->params.name);
 
 		cvShowImage(i->params.name, (CvArr*)(i->params.frame));
-		++(i->stats.tally);
 		cvWaitKey(10);
+		++(i->stats.tally);
 	}
 	return 0;
 }
