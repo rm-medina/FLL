@@ -21,12 +21,15 @@
 #include "detect.h"
 #include "track.h"
 #include "time_utils.h"
+#include "debug.h"
 
 extern const char *fll_version_name;
 #define FLL_MAX_SERVO_COUNT SERVOLIB_MAX_SERVO_COUNT
 #define FLL_SERVO_COUNT 2
+#define FLL ((struct stage *)NULL)
 
 static struct pipeline fllpipe;
+static volatile sigset_t set;
 
 
 static int with_output;
@@ -134,14 +137,16 @@ static void usage(void)
 /*helper function*/
 static void *signal_catch(void *arg)
 {
-	sigset_t *monitorset = arg;
+	sigset_t *monitorset = (sigset_t*)arg;
 	int sig;
-	
 	for (;;) {
 		sigwait(monitorset, &sig);
 		
-		//printf("caught signal %d. Terminate!\n", sig);
-		pipeline_terminate(&fllpipe, -EINTR);
+		printf("caught signal %d. Terminate!\n", sig);
+		if (sig == SIGINT) {
+			pipeline_terminate(&fllpipe, -EINTR);
+			break;
+		}
 	}
 	return NULL;
 }
@@ -149,19 +154,21 @@ static void *signal_catch(void *arg)
 	
 static void setup_term_signals(void)
 {
-	static sigset_t set;
 	pthread_attr_t attr;
 	pthread_t id;
+       
 
-	sigemptyset(&set);
-	sigaddset(&set, SIGTERM);
-	sigaddset(&set, SIGHUP);
-	sigaddset(&set, SIGINT);
-	sigaddset(&set, SIGQUIT);
-	pthread_sigmask(SIG_BLOCK, &set, NULL);
+	sigemptyset((sigset_t*)&set);
+	sigaddset((sigset_t*)&set, SIGTERM); /* 0x4000 */
+	sigaddset((sigset_t*)&set, SIGHUP);  /* 0x0001 */
+	sigaddset((sigset_t*)&set, SIGINT);  /* 0x0002 */
+	sigaddset((sigset_t*)&set, SIGQUIT); /* 0x0003 */
+	
+	/*all threads created after this point will share same mask.*/
+	pthread_sigmask(SIG_BLOCK, (sigset_t*)&set, NULL);
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	pthread_create(&id, &attr, signal_catch, &set);
+	pthread_create(&id, &attr, signal_catch, (sigset_t*)&set);
 	pthread_attr_destroy(&attr);
 }
 
@@ -246,14 +253,17 @@ int main(int argc, char *const argv[])
 	if (outfile != NULL)
 		printf("output data:%s.\n", outfile);
 
+	setup_term_signals();
+
 	pipeline_init(&fllpipe);
+
+
 	/* first stage */
 	camera_params.name = malloc(10);
 	ret = asprintf(&camera_params.name, "FLL cam%d", video);
 	if (ret < 0)
 		goto terminate;
 	
-	setup_term_signals();
 
 	camera_params.vididx = video;
 	camera_params.frame = NULL;
@@ -298,12 +308,12 @@ int main(int argc, char *const argv[])
 
 	
 	for (i=0; i < FLL_MAX_SERVO_COUNT; i++)
-		printf("servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
+		debug(FLL, "servo channel %d, pos:%d, speedLim:%d, accelLim:%d.\n",
 		       i, pos[i], speed[i], accel[i]);
 
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 	for (l=0; ret >= 0; l++)  {
-		printf("loop:%d.\n", l);
+		debug(FLL, "loop:%d.\n", l);
 		ret = pipeline_run(&fllpipe);
 		if (ret) {
 			printf("Cannot run FLL, ret:%d.\n", ret);
@@ -316,6 +326,9 @@ int main(int argc, char *const argv[])
 			break;
 		} 
 #endif
+        	if (fllpipe.status == STAGE_ABRT)
+			break;
+
 		if (loops && (l >= loops))
 			break;
 	};

@@ -6,6 +6,7 @@
 
 #include "pipeline.h"
 #include "time_utils.h"
+#include "debug.h"
 
 static void *stage_worker(void *arg);
 
@@ -44,26 +45,26 @@ static void *stage_worker(void *arg)
 		/*wait for 'go' signal*/
 		ret = sem_wait(&step->nowait);
 		if (ret)
-			printf("step %d wait error %d.\n",
+			debug(step, "step %d wait error %d.\n",
 			       step->params.nth_stage, ret);
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		if (step->ops->input)
 			ret = step->ops->input(step, NULL);
 		if (ret)
-			printf("step %d input error %d.\n",
+			debug(step, "step %d input error %d.\n",
 			       step->params.nth_stage, ret);
 		ret = step->ops->run(step);
 		if (ret)
-			printf("step %d run error %d.\n",
+			debug(step, "step %d run error %d.\n",
 			       step->params.nth_stage, ret);
 		clock_gettime(CLOCK_MONOTONIC, &stop);
 		timespec_substract(&step->duration, &stop, &start);
 		sem_post(&step->done);
 	}
 	if (ret < 0)
-		printf("step %d failed.\n", step->params.nth_stage);
+		debug(step, "step %d failed.\n", step->params.nth_stage);
 
-	printf("step %d performance: nofinterest=%ld.\n",
+	debug(step, "step %d performance: nofinterest=%ld.\n",
 	       step->params.nth_stage,
 	       step->stats.ofinterest);
 
@@ -79,7 +80,7 @@ void stage_wait(struct stage *stg)
 {
 	int ret = sem_wait(&stg->done);
 	if (ret)
-		printf("%s: step %d wait error %d.\n",
+		debug(stg, "%s: step %d wait error %d.\n",
 		       __func__, stg->params.nth_stage, ret);
 
 }
@@ -167,7 +168,7 @@ int pipeline_run(struct pipeline *pipe)
 	
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
 		s = pipe->stgs[n];
-		printf("%s: run stage %d in:%p %p.\n", __func__,
+		debug(s, "%s: run stage %d in:%p %p.\n", __func__,
 		       s->params.nth_stage, s->params.data_in,
 		       s->params.data_out);
 
@@ -178,7 +179,7 @@ int pipeline_run(struct pipeline *pipe)
 		s->ops->go(s);
 		ret = sem_wait(&s->done);
 		if (ret) {
-			printf("step %d done error %d.\n",
+			debug(s, "step %d done error %d.\n",
 			       s->params.nth_stage, ret);
 			break;
 		}
@@ -189,12 +190,12 @@ int pipeline_run(struct pipeline *pipe)
 		timespec_substract(&delta, &now, &before);
 		timespec_add(&s->stats.overall, &delta);
 		
-		printf("stage %d: delta->  %lds %ldns .\n", s->params.nth_stage,
+		debug(s, "stage %d: delta->  %lds %ldns .\n", s->params.nth_stage,
 		       delta.tv_sec , delta.tv_nsec);
-		printf("stage %d: count: %ld. \n", s->params.nth_stage,
+		debug(s, "stage %d: count: %ld. \n", s->params.nth_stage,
 		       s->stats.ofinterest);
 
-		printf("stage %d: overall: %lds %ldns. \n", s->params.nth_stage,
+		debug(s, "stage %d: overall: %lds %ldns. \n", s->params.nth_stage,
 		       s->stats.overall.tv_sec,
 		       s->stats.overall.tv_nsec);
 
@@ -207,7 +208,7 @@ int pipeline_run(struct pipeline *pipe)
 			 (s->stats.overall.tv_sec)) :
 			s->stats.ofinterest;
 
-		printf("stage %d: frequency (count/s) : %ld .\n",
+		debug(s, "stage %d: frequency (count/s) : %ld .\n",
 		       s->params.nth_stage,
 		       s->stats.persecond);
 		
@@ -223,7 +224,7 @@ int pipeline_run(struct pipeline *pipe)
 
 void pipeline_terminate(struct pipeline *pipe, int reason)
 {
-	//printf("aborting (reason:%d)/n", reason);
+	printf("aborting (reason:%d)/n", reason);
 	pipe->status = STAGE_ABRT;
 }
 
@@ -254,7 +255,7 @@ void pipeline_teardown(struct pipeline *pipe)
 	
 	for (n=CAPTURE_STAGE; n < PIPELINE_MAX_STAGE; n++) {
 		s = pipe->stgs[n];
-		if (s->self) {
+		if (s && s->self) {
 			printf("%s: run stage %d.\n", __func__,
 			       s->params.nth_stage);
 			s->ops->down(s);

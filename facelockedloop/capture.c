@@ -15,6 +15,7 @@
 
 #include "capture.h"
 #include "kernel_utils.h"
+#include "debug.h"
 
 static void capture_stage_up(struct stage *stg, struct stage_params *p,
 			     struct stage_ops *o,struct pipeline *pipe);
@@ -91,6 +92,7 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 	stgparams.nth_stage = CAPTURE_STAGE;
 	stgparams.data_in = NULL;
 	stgparams.data_out = NULL;
+	stgparams.name = "CAP_STG";
 
 	i->stats.tally = 0;
 	i->stats.fps = 0;
@@ -104,10 +106,15 @@ int capture_initialize(struct imager *i, struct imager_params *p,
 	if (!(i->params.videocam))
 		return -ENODEV;
 	p->videocam = i->params.videocam;
+#if 0
+	/*if webcam format changes it requires modifications to the servo algorithms */
+	cvSetCaptureProperty(i->params.videocam, CV_CAP_PROP_FRAME_WIDTH, 640.0);
+	cvSetCaptureProperty(i->params.videocam, CV_CAP_PROP_FRAME_HEIGHT, 480.0);
+#endif
+	cvSetCaptureProperty(i->params.videocam, CV_CAP_PROP_FPS, 30);
+	debug(i, "display window is %s.\n", i->params.name);
 
-	printf("display window is %s.\n", i->params.name);
-
-	cvNamedWindow(p->name, CV_WINDOW_AUTOSIZE);
+	//cvNamedWindow(p->name, CV_WINDOW_AUTOSIZE);
 
 	capture_stage_up(&i->step, &stgparams, &capture_ops, pipe);
 	return 0;
@@ -137,16 +144,16 @@ int capture_run(struct imager *i)
 
 		++(i->params.frameidx);
 		i->params.frame = srcframe;
-		printf("cam%d captured %dth image(%p = %p): %dx%d with [%d channels,"
+		debug(i, "cam%d captured %dth image(%p = %p): %dx%d with [%d channels,"
 		       "%d step, %p data.\n",
  		       i->params.vididx , i->params.frameidx, srcframe,
 		       i->params.frame,
 		       srcframe->height, srcframe->width, srcframe->nChannels,
 		       srcframe->widthStep, srcframe->imageData);
-		printf("show on %s.\n", i->params.name);
+		debug(i, "show on %s.\n", i->params.name);
 
-		cvShowImage(i->params.name, (CvArr*)(i->params.frame));
-		cvWaitKey(10);
+		//cvShowImage(i->params.name, (CvArr*)(i->params.frame));
+		//cvWaitKey(10);
 		++(i->stats.tally);
 	}
 	return 0;
