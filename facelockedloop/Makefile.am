@@ -37,7 +37,9 @@ fll_SOURCES = \
 	detect.h \
 	track.c	\
 	track.h \
-	store.h
+	store.h \
+	debug.c \
+	debug.h
 
 fll_CPPFLAGS =		\
 	@FLL_CFLAGS@ @FLL_EXTRA_CFLAGS@	\
