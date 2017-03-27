@@ -1,6 +1,6 @@
 # FLL project
 
-SUBDIRS = include servolib facelockedloop @FLL_MAYBE_DOCDIR@
+SUBDIRS = include servolib facelockedloop
 
 SUBDIRS += @FLL_MAYBE_DOCDIR@
 

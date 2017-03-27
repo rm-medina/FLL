@@ -73,6 +73,9 @@ case "$build_for" in
  i*86*-*)
 	target_arch=x86_32
 	;;
+ aarch64-unknown-*)
+	target_arch=arm64
+	;;
  *) echo ""
    echo "*******************************************"
    echo "Unsupported target: $build_for !!!!!"
