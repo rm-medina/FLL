@@ -20,6 +20,7 @@ enum object_detector_t {
 #if defined(HAVE_OPENCV2)
 
 struct detector_params {
+	const char *name;
 	enum object_detector_t odt;
 	char *cascade_xml;
 	IplImage* srcframe;
@@ -33,6 +34,7 @@ struct detector_params {
 
 #else
 struct detector_params {
+	const char *name;
 	enum object_detector_t odt;
 	char *cascade_xml;
 	void* srcframe;

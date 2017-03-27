@@ -20,6 +20,7 @@ struct stage;
 #define STAGE_ABRT 0x1 /*abort received*/
 	
 struct stage_params {
+	const char *name;
 	int nth_stage;
 	void *data_in;
 	void *data_out;

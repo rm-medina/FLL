@@ -17,6 +17,7 @@ struct tracker_stats {
 };
 
 struct tracker_params {
+	const char *name;
 	int dev;
 	int pan_tgt;
 	int tilt_tgt;
