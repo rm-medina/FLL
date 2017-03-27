@@ -11,6 +11,7 @@
 #include "detect.h"
 #include "store.h"
 #include "kernel_utils.h"
+#include "debug.h"
 
 #if defined(HAVE_OPENCV2)
 //#include "opencv2/highgui.hpp"
@@ -76,7 +77,7 @@ static int detect_stage_run(struct stage *stg)
 	
 	ret = detect_run(algo);
 	/* pass only first face detected to next stage */
-	stg->params.data_out = &algo->params.faceboxs[0];
+	stg->params.data_out = algo->params.faceboxs;
 	stg->stats.ofinterest = algo->stats.facecount;
 	
 	return ret;
@@ -106,6 +107,10 @@ static int detect_stage_input(struct stage *stg, void **it)
 	stage_input(stg, &itin);
 
 	algo->params.srcframe = itin;
+	algo->params.faceboxs = NULL;
+	if (!algo->params.scratchbuf)
+		return -EINVAL;	
+
 	return 0;
 }
 
@@ -126,6 +131,7 @@ int detect_initialize(struct detector *d, struct detector_params *p,
 	stgparams.nth_stage = DETECTION_STAGE;
 	stgparams.data_in = NULL;
 	stgparams.data_out = NULL;
+	stgparams.name = "DET_STG";
 
 	d->params = *p;
 
@@ -180,12 +186,15 @@ int detect_run(struct detector *d)
 	if (!d->params.scratchbuf)
 		return -ENOMEM;
 
-
-	d->params.dstframe = cvCreateImage(cvSize(d->params.srcframe->width,
-						  d->params.srcframe->height),
-					   d->params.srcframe->depth, 1);
-	if (d->params.dstframe == NULL)
-		return -ENOMEM;
+	if (!d->params.dstframe) {
+		debug(d, "allocate gray image only once\n");
+		d->params.dstframe = cvCreateImage(cvSize(d->params.srcframe->width, 
+							  d->params.srcframe->height),
+							  d->params.srcframe->depth, 
+							  1);
+		if (!d->params.dstframe)
+			return -ENOMEM;
+	}
 
 	switch(d->params.odt) {
 	case CDT_HAAR:
@@ -219,18 +228,18 @@ int detect_run(struct detector *d)
 		faces = 0;
 	};
 	if (!faces) {
-		printf("No face struct, cdt=%d.\n", d->params.odt);
+		debug(d, "No face struct, cdt=%d.\n", d->params.odt);
 		d->stats.facecount = 0;
 	}
-	else {
-		d->params.faceboxs = detect_store(faces, d->params.dstframe, 1);
+	else 
 		d->stats.facecount = faces->total;
-	}
-	
-	cvShowImage("FLL detection", (CvArr*)(d->params.dstframe));
+
+	d->params.faceboxs = detect_store(faces, d->params.srcframe, 1);
+	if (!d->params.faceboxs)
+		return -ENOMEM;
+
+	cvShowImage("FLL detection", (CvArr*)(d->params.srcframe));
 	cvWaitKey(10);
-	cvReleaseImage(&d->params.dstframe);
-	d->params.dstframe = NULL;
 	return 0;
 
 }
@@ -278,17 +287,24 @@ static CvSeq* detect_run_latentSVM_algorithm(IplImage* frame,
 
 static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 {
-	int i;
+	int i, nbbox;
 	CvPoint ptA, ptB;
+	CvFont font;
 	struct store_box *bbpos;
+	char *text;
 
-	if (!faces || (faces->total ==0))
-		return NULL;
-	
-	bbpos = calloc(faces->total, sizeof(struct store_box));
+	nbbox = faces->total ? faces->total : 1;
+	bbpos = calloc(nbbox, sizeof(*bbpos));
 	if (!bbpos)
 		return NULL;
+	if (!faces || !faces->total) {
+		bbpos->scan = 1;
+		goto done;
+	}
+	
+	cvInitFont(&font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, 8);
 	printf("%d faces.\n", faces->total);
+
 	for (i = 0; i < faces->total; i++)
 	{
 		CvRect* rAB = (CvRect*)cvGetSeqElem(faces, i);
@@ -298,14 +314,20 @@ static struct store_box* detect_store(CvSeq* faces, IplImage* img, int scale)
 		ptB.y = (rAB->y+rAB->height)*scale;
 		cvRectangle(img, ptA, ptB, CV_RGB(255,0,0), 3, 8, 0 );
 		printf("(%d,%d) and (%d,%d).\n", ptA.x, ptA.y, ptB.x, ptB.y);
-		if (!bbpos)
-			continue;
+		
 		bbpos[i].ptA_x = ptA.x;
 		bbpos[i].ptA_y = ptA.y;
 		bbpos[i].ptB_x = ptB.x;
 		bbpos[i].ptB_y = ptB.y;
+
+		asprintf(&text, "detected: %dx%d", rAB->width, rAB->height);
+		ptB.y += 15;
+		ptB.x = ptA.x;
+		cvPutText(img, text, ptB, &font, CV_RGB(0,255,0));
+
+		free(text);
 	}
-	cvShowImage("FLL detection", (CvArr*)img);
+done:
 	return bbpos;
 }
 
